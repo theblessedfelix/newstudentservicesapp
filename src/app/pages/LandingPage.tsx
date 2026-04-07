@@ -39,7 +39,7 @@ export default function LandingPage() {
               onClick={() => window.location.assign('/admin.html')}
               className="w-full sm:w-auto px-10 py-3.5 rounded-md border border-gray-300 bg-white text-gray-700 font-bold text-base hover:bg-gray-50 transition-all active:scale-95"
             >
-              Learn more
+              Admin Portal
             </button>
           </div>
         </section>

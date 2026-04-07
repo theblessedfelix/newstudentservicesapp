@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Calendar, Search, Users, X } from 'lucide-react';
-import { toast, Toaster } from 'sonner';
+import { ArrowLeft, Calendar, Users, X } from 'lucide-react';
+import { Toaster } from 'sonner';
 import AppNavbar from '../../components/AppNavbar';
 
 interface Student {
-  id: number;
+  id: string;
   studentId: string;
   name: string;
-  campus: 'Lagos Island' | 'Lagos Mainland';
+  campus: string;
   level: 'Level 1' | 'Level 2';
-  email: string;
-  enrollmentDate: string;
 }
 
 interface AttendanceRecord {
@@ -24,57 +22,18 @@ export default function Level2StudentManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  const [students, setStudents] = useState<Student[]>([
-    { id: 9, studentId: 'STU009', name: 'Folake Itoro', campus: 'Lagos Island', level: 'Level 2', email: 'folake@bibleschool.edu', enrollmentDate: 'Jan 20, 2026' },
-    { id: 10, studentId: 'STU010', name: 'Gbemileke Okafor', campus: 'Lagos Mainland', level: 'Level 2', email: 'gbemileke@bibleschool.edu', enrollmentDate: 'Jan 25, 2026' },
-    { id: 11, studentId: 'STU011', name: 'Helen Chukwu', campus: 'Lagos Island', level: 'Level 2', email: 'helen@bibleschool.edu', enrollmentDate: 'Feb 5, 2026' },
-    { id: 12, studentId: 'STU012', name: 'Ibrahim Yusuf', campus: 'Lagos Mainland', level: 'Level 2', email: 'ibrahim@bibleschool.edu', enrollmentDate: 'Feb 10, 2026' },
-    { id: 13, studentId: 'STU013', name: 'Jumoke Adeyinka', campus: 'Lagos Island', level: 'Level 2', email: 'jumoke@bibleschool.edu', enrollmentDate: 'Feb 15, 2026' },
-    { id: 14, studentId: 'STU014', name: 'Kola Bankole', campus: 'Lagos Mainland', level: 'Level 2', email: 'kola@bibleschool.edu', enrollmentDate: 'Feb 20, 2026' },
-    { id: 15, studentId: 'STU015', name: 'Lola Oseni', campus: 'Lagos Island', level: 'Level 2', email: 'lola@bibleschool.edu', enrollmentDate: 'Mar 1, 2026' },
-    { id: 16, studentId: 'STU016', name: 'Marcus Adebayo', campus: 'Lagos Mainland', level: 'Level 2', email: 'marcus@bibleschool.edu', enrollmentDate: 'Mar 8, 2026' },
-  ]);
+  // Students will be populated from the database
+  const [students] = useState<Student[]>([]);
 
-  // Sample attendance data for each student
-  const getAttendanceHistory = (studentId: string): AttendanceRecord[] => {
-    const baseData: Record<string, AttendanceRecord[]> = {
-      'STU009': [
-        { date: 'Apr 5, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 29, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Adebayo Lawal' },
-        { date: 'Mar 22, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Ruth Okafor' },
-        { date: 'Mar 15, 2026', session: 'Afternoon Session', status: 'absent', volunteer: 'David Akin' },
-        { date: 'Mar 8, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Grace Nnaji' },
-      ],
-      'STU010': [
-        { date: 'Apr 5, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Ruth Okafor' },
-        { date: 'Mar 29, 2026', session: 'Afternoon Session', status: 'absent', volunteer: 'Adebayo Lawal' },
-        { date: 'Mar 22, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 15, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'David Akin' },
-      ],
-      'STU011': [
-        { date: 'Apr 5, 2026', session: 'Afternoon Session', status: 'absent', volunteer: 'David Akin' },
-        { date: 'Mar 29, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Adebayo Lawal' },
-        { date: 'Mar 22, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Ruth Okafor' },
-      ],
-      'STU012': [
-        { date: 'Apr 5, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 29, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Ruth Okafor' },
-        { date: 'Mar 22, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'Adebayo Lawal' },
-        { date: 'Mar 15, 2026', session: 'Afternoon Session', status: 'present', volunteer: 'David Akin' },
-        { date: 'Mar 8, 2026', session: 'Afternoon Session', status: 'absent', volunteer: 'Grace Nnaji' },
-      ],
-    };
-    return baseData[studentId] || [];
-  };
+  // Attendance records will be fetched from the database per student
+  const getAttendanceHistory = (_studentId: string): AttendanceRecord[] => [];
 
   const filteredStudents = useMemo(() => {
-    return students.filter((student) => {
-      const matchSearch =
-        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.studentId.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchSearch;
-    });
+    if (!searchQuery.trim()) return students;
+    const q = searchQuery.toLowerCase();
+    return students.filter(s =>
+      s.name.toLowerCase().includes(q) || s.studentId.toLowerCase().includes(q)
+    );
   }, [students, searchQuery]);
 
   const getInitials = (name: string) => {
@@ -94,7 +53,7 @@ export default function Level2StudentManagement() {
       <Toaster position="top-right" richColors />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
-          <AppNavbar ctaHref="/admin#/dashboard" />
+          <AppNavbar ctaHref="/admin.html#/dashboard" />
         </div>
 
         <div className="mb-12">

@@ -11,11 +11,11 @@ export default function AdminLogin() {
         <AppNavbar
           ctaHref="/admin.html#/dashboard"
           items={[
-            { label: 'Add new student', href: '/admin.html#/students' },
+            { label: 'Student Records', href: '/admin.html#/students' },
             { label: 'ID Collection', href: '/admin.html#/id-cards' },
-            { label: 'Volunteer Sign up', href: '/admin.html#/volunteers' },
-            { label: 'Knowledge Based', href: '/admin.html#/reports' },
-            { label: 'RHEMA Website', href: '/admin.html#/' },
+            { label: 'Volunteer Accounts', href: '/admin.html#/volunteers' },
+            { label: 'Reports', href: '/admin.html#/reports' },
+            { label: 'Approvals Queue', href: '/admin.html#/approvals' },
           ]}
         />
 

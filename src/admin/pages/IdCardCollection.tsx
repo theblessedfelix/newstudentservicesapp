@@ -15,11 +15,9 @@ export default function IdCardCollection() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COLLECTED' | 'PENDING'>('ALL');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  const [students, setStudents] = useState<Student[]>([
-    { id: 1, name: 'Jane Doe', studentId: 'STU001', campus: 'Lagos Island', level: 'Level 1', status: 'N/A' },
-    { id: 2, name: 'Jane Doe', studentId: 'STU002', campus: 'Lagos Mainland', level: 'Level 2', status: 'COLLECTED' },
-    { id: 3, name: 'Jane Doe', studentId: 'STU003', campus: 'Lagos Island', level: 'Level 1', status: 'PENDING' },
-  ]);
+  // Students will be populated from the database
+  const [students, setStudents] = useState<Student[]>([]);
+
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -44,7 +42,7 @@ export default function IdCardCollection() {
     <div className="min-h-screen bg-[#f6f3ee] text-slate-900 antialiased">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
-          <AppNavbar ctaHref="/admin#/dashboard" />
+          <AppNavbar ctaHref="/admin.html#/dashboard" />
         </div>
 
         <div className="mb-10">
@@ -147,7 +145,9 @@ export default function IdCardCollection() {
         </div>
 
         <footer className="py-8 text-center">
-          <p className="text-gray-500 text-sm">Trusted globally by over 3,000+ companies</p>
+          <p className="italic text-gray-400 text-xs font-serif">
+            "Whatever you do, work at it with all your heart"
+          </p>
         </footer>
       </div>
 
