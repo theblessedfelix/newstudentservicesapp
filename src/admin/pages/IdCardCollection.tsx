@@ -44,7 +44,7 @@ export default function IdCardCollection() {
     <div className="min-h-screen bg-[#f6f3ee] text-slate-900 antialiased">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
-          <AppNavbar ctaHref="/admin#/dashboard" />
+          <AppNavbar ctaHref="/admin.html#/dashboard" />
         </div>
 
         <div className="mb-10">
@@ -147,7 +147,9 @@ export default function IdCardCollection() {
         </div>
 
         <footer className="py-8 text-center">
-          <p className="text-gray-500 text-sm">Trusted globally by over 3,000+ companies</p>
+          <p className="italic text-gray-400 text-xs font-serif">
+            "Whatever you do, work at it with all your heart"
+          </p>
         </footer>
       </div>
 

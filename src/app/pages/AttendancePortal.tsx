@@ -8,14 +8,14 @@ export default function AttendancePortal() {
   const portals = [
     {
       title: "Volunteer Portal",
-      description: "Take attendance, register students, and view records.",
+      description: "Take attendance and register students for your assigned sessions.",
       path: "/volunteer",
       icon: <UserPlus className="h-10 w-10 text-orange-500" />,
     },
     {
       title: "Admin Portal",
-      description: "Take attendance, register students, and view records.",
-      path: "/admin",
+      description: "Manage records, process approvals, generate reports, and oversee ID collections.",
+      path: "/admin.html",
       isExternal: true,
       icon: <Settings className="h-10 w-10 text-slate-500" />,
     }
@@ -34,8 +34,8 @@ export default function AttendancePortal() {
             Attendance Portal
           </h1>
           <p className="max-w-xl text-center text-slate-500 text-sm md:text-base leading-relaxed px-4 mb-16">
-            Offline-first student attendance and records platform designed 
-            for Bible School operations. Fast, reliable, and built for weekend sessions.
+            Choose your portal below. Volunteers manage attendance and student registration.
+            Admins handle records, approvals, reports, and ID card collections.
           </p>
 
           {/* Portal Cards - Standardized Sizing & Icon Geometry */}

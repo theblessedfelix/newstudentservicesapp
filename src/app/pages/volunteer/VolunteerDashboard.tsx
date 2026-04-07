@@ -8,22 +8,22 @@ export default function VolunteerDashboard() {
   const modules = [
     {
       title: 'Level 1 Sessions',
-      description: 'Open weekend sessions and start attendance for Level 1 students.',
-      action: () => navigate('/volunteer/level-1-sessions'),
+      description: 'Select a weekend session and take attendance for Level 1 students.',
+      action: () => navigate('/volunteer/level-1'),
     },
     {
       title: 'Level 2 Sessions',
-      description: 'Open weekend sessions and start attendance for Level 2 students.',
-      action: () => navigate('/volunteer/level-2-sessions'),
+      description: 'Select a weekend session and take attendance for Level 2 students.',
+      action: () => navigate('/volunteer/level-2'),
     },
     {
       title: 'Register Student',
-      description: 'Create and submit a new student registration for approval.',
+      description: 'Submit a new student registration for admin approval.',
       action: () => navigate('/volunteer/register'),
     },
     {
       title: 'Student Records',
-      description: 'View student records. Choose level first.',
+      description: 'Search and view student attendance records by level.',
       action: () => navigate('/volunteer/student-records-choice'),
     },
   ];
@@ -37,9 +37,9 @@ export default function VolunteerDashboard() {
           <section className="text-center">
             <h1 className="text-4xl sm:text-5xl font-black tracking-tight">Volunteer Dashboard</h1>
             <p className="mt-5 text-slate-700 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-              Offline-first student attendance and records platform designed
+              Welcome. Use the modules below to take attendance, register students,
               <br className="hidden sm:block" />
-              for Bible School operations. Fast, reliable, and built for weekend sessions
+              or look up student records for your assigned sessions.
             </p>
           </section>
 

@@ -14,13 +14,13 @@ export default function AdminModulePage({ title, description }: AdminModulePageP
     <div className="min-h-screen bg-[#f2f2f5] text-slate-900 antialiased">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
         <AppNavbar
-          ctaHref="/admin#/dashboard"
+          ctaHref="/admin.html#/dashboard"
           items={[
-            { label: 'Add new student', href: '/admin#/students' },
-            { label: 'ID Collection', href: '/admin#/id-cards' },
-            { label: 'Volunteer Sign up', href: '/admin#/volunteers' },
-            { label: 'Knowledge Based', href: '/admin#/reports' },
-            { label: 'RHEMA Website', href: '/admin#/dashboard' },
+            { label: 'Student Records', href: '/admin.html#/students' },
+            { label: 'ID Collection', href: '/admin.html#/id-cards' },
+            { label: 'Volunteer Accounts', href: '/admin.html#/volunteers' },
+            { label: 'Reports', href: '/admin.html#/reports' },
+            { label: 'Approvals Queue', href: '/admin.html#/approvals' },
           ]}
         />
 
@@ -40,7 +40,9 @@ export default function AdminModulePage({ title, description }: AdminModulePageP
         </main>
 
         <footer className="py-12 text-center">
-          <p className="text-gray-500 text-sm">Trusted globally by over 3,000+ companies</p>
+          <p className="italic text-gray-400 text-xs font-serif">
+            "Whatever you do, work at it with all your heart"
+          </p>
         </footer>
       </div>
     </div>

@@ -9,17 +9,17 @@ export default function StudentRecordsChoice() {
     <div className="min-h-screen bg-white text-slate-900 antialiased">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
-          <AppNavbar ctaHref="/admin#/dashboard" />
+          <AppNavbar ctaHref="/admin.html#/dashboard" />
         </div>
 
         <div className="text-center mb-16">
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-black mb-4">
-            View & Manage Student Record
+            View & Manage Student Records
           </h1>
           <p className="text-slate-600 text-lg max-w-3xl mx-auto leading-relaxed">
-            Offline-first student attendance and records platform designed
+            Select a level to view student profiles, manage records,
             <br className="hidden sm:block" />
-            for Bible School operations. Fast, reliable, and built for weekend sessions
+            and review detailed attendance history.
           </p>
         </div>
 
@@ -32,9 +32,9 @@ export default function StudentRecordsChoice() {
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 group-hover:bg-black transition-colors mb-6">
               <span className="text-2xl font-bold text-slate-600 group-hover:text-white transition-colors">1</span>
             </div>
-            <h2 className="text-2xl font-bold text-black mb-3">Level 1 Student Records</h2>
+            <h2 className="text-2xl font-bold text-black mb-3">Level 1 Students</h2>
             <p className="text-slate-600 text-base leading-relaxed mb-6">
-              Take attendance, register students, and view records
+              View, search, and manage student records and attendance for Level 1.
             </p>
             <div className="flex items-center gap-2 text-black font-semibold group-hover:gap-3 transition-all">
               <span>Proceed</span>
@@ -50,9 +50,9 @@ export default function StudentRecordsChoice() {
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 group-hover:bg-black transition-colors mb-6">
               <span className="text-2xl font-bold text-slate-600 group-hover:text-white transition-colors">2</span>
             </div>
-            <h2 className="text-2xl font-bold text-black mb-3">Level 2 Student Records</h2>
+            <h2 className="text-2xl font-bold text-black mb-3">Level 2 Students</h2>
             <p className="text-slate-600 text-base leading-relaxed mb-6">
-              Take attendance, register students, and view records
+              View, search, and manage student records and attendance for Level 2.
             </p>
             <div className="flex items-center gap-2 text-black font-semibold group-hover:gap-3 transition-all">
               <span>Proceed</span>

@@ -10,11 +10,10 @@ interface AppNavbarProps {
 }
 
 const defaultItems: NavItem[] = [
-  { label: 'Add new student', href: '/volunteer/register' },
-  { label: 'ID Collection', href: '/admin#/id-cards' },
-  { label: 'Volunteer Sign up', href: '/volunteer' },
-  { label: 'Knowledge Based', href: '/attendance-portal' },
-  { label: 'RHEMA Website', href: '/attendance-portal' },
+  { label: 'Register Student', href: '/volunteer/register' },
+  { label: 'ID Collection', href: '/admin.html#/id-cards' },
+  { label: 'Volunteer Login', href: '/volunteer' },
+  { label: 'Admin Portal', href: '/admin.html' },
 ];
 
 export default function AppNavbar({
