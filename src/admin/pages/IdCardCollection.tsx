@@ -15,11 +15,9 @@ export default function IdCardCollection() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COLLECTED' | 'PENDING'>('ALL');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  const [students, setStudents] = useState<Student[]>([
-    { id: 1, name: 'Jane Doe', studentId: 'STU001', campus: 'Lagos Island', level: 'Level 1', status: 'N/A' },
-    { id: 2, name: 'Jane Doe', studentId: 'STU002', campus: 'Lagos Mainland', level: 'Level 2', status: 'COLLECTED' },
-    { id: 3, name: 'Jane Doe', studentId: 'STU003', campus: 'Lagos Island', level: 'Level 1', status: 'PENDING' },
-  ]);
+  // Students will be populated from the database
+  const [students, setStudents] = useState<Student[]>([]);
+
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
