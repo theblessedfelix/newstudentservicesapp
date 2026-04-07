@@ -68,17 +68,8 @@ export default function TakeAttendance() {
     return data;
   };
 
-  // Mock student database
-  const allStudents: Student[] = [
-    { id: '1', studentId: 'STU001', name: 'John Doe', initials: 'JD' },
-    { id: '2', studentId: 'STU002', name: 'Jane Smith', initials: 'JS' },
-    { id: '3', studentId: '12345', name: 'Michael Johnson', initials: 'MJ' },
-    { id: '4', studentId: '67890', name: 'Emily Brown', initials: 'EB' },
-    { id: '5', studentId: 'STU005', name: 'David Wilson', initials: 'DW' },
-    { id: '6', studentId: '54321', name: 'Sarah Davis', initials: 'SD' },
-    { id: '7', studentId: 'STU007', name: 'James Miller', initials: 'JM' },
-    { id: '8', studentId: '98765', name: 'Lisa Anderson', initials: 'LA' },
-  ];
+  // Student lookup database — will be populated from the real database
+  const allStudents: Student[] = [];
 
   // Auto-focus input on mount
   useEffect(() => {
