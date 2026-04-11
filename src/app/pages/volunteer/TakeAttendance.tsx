@@ -17,6 +17,7 @@ import {
 } from './attendanceConfig';
 import { approvalService } from '../../../features/approvals/approvalService';
 import { attendanceService } from '../../../features/attendance/attendanceService';
+import { studentService } from '../../../features/students/studentService';
 import { useAuth } from '../../../features/auth/AuthProvider';
 import { sessionService } from '../../../features/sessions/sessionService';
 
@@ -167,6 +168,7 @@ export default function TakeAttendance() {
   const [selectedDay, setSelectedDay] = useState<AttendanceDayId | null>(null);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [idInput, setIdInput] = useState('');
+  const [supabaseStudents, setSupabaseStudents] = useState<any[]>([]);
   const [checkedInStudents, setCheckedInStudents] = useState<CheckedInStudent[]>([]);
   const [countdownTime, setCountdownTime] = useState(0); // Will be set based on session time remaining
   const [searchQuery, setSearchQuery] = useState('');
@@ -183,7 +185,27 @@ export default function TakeAttendance() {
   const selectedDayConfig = selectedLevelConfig?.days.find((day) => day.id === selectedDay) ?? null;
   const todayWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) as DayOfWeek | string;
   const todayAttendanceDay = selectedLevelConfig?.days.find((day) => day.dayOfWeek === todayWeekday) ?? null;
-  const allStudents: Student[] = selectedLevelConfig ? selectedLevelConfig.getStudents() : [];
+  // Load students from Supabase on component mount
+  useEffect(() => {
+    const loadStudents = async () => {
+      try {
+        const records = await studentService.listStudents();
+        const converted = records.map(r => ({
+          id: String(r.id),
+          studentId: r.studentId,
+          name: r.name,
+          initials: r.studentId.substring(0, 3).toUpperCase(),
+        }));
+        setSupabaseStudents(converted);
+      } catch (err) {
+        console.error('Failed to load students from Supabase:', err);
+      }
+    };
+    loadStudents();
+  }, []);
+
+  // Use Supabase students if available, otherwise fallback to hardcoded registry
+  const allStudents: Student[] = supabaseStudents.length > 0 ? supabaseStudents : (selectedLevelConfig ? selectedLevelConfig.getStudents() : []);
   const studentsByLevel = useMemo(
     () => ({
       'Level 1': ATTENDANCE_LEVEL_MAP['Level 1'].getStudents(),
