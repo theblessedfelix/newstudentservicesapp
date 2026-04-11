@@ -1,17 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { LogIn, User, Lock, ArrowLeft } from 'lucide-react';
 import AppNavbar from '../../../components/AppNavbar';
+import { useAuth } from '../../../features/auth/AuthProvider';
 
 export default function VolunteerLogin() {
   const navigate = useNavigate();
+  const { session, signInWithRole } = useAuth();
   const [volunteerId, setVolunteerId] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (volunteerId && password) {
+  useEffect(() => {
+    if (session?.role === 'volunteer') {
       navigate('/volunteer/dashboard');
+    }
+  }, [navigate, session]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setIsSubmitting(true);
+
+    try {
+      await signInWithRole({
+        identifier: volunteerId.trim(),
+        password,
+        role: 'volunteer',
+      });
+      navigate('/volunteer/dashboard');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -81,10 +103,17 @@ export default function VolunteerLogin() {
               {/* The Strong Black Button */}
               <button
                 type="submit"
-                className="w-full bg-black text-white py-3.5 px-6 rounded-xl font-bold text-sm hover:bg-gray-800 transition-all active:scale-[0.98] mt-2 shadow-lg shadow-gray-200"
+                disabled={isSubmitting}
+                className="w-full bg-black text-white py-3.5 px-6 rounded-xl font-bold text-sm hover:bg-gray-800 transition-all active:scale-[0.98] mt-2 shadow-lg shadow-gray-200 disabled:opacity-60"
               >
-                Sign In
+                {isSubmitting ? 'Signing In...' : 'Sign In'}
               </button>
+
+              {errorMessage && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  {errorMessage}
+                </p>
+              )}
             </form>
 
             <button

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
-import { ArrowLeft } from 'lucide-react';
 import AppNavbar from '../../components/AppNavbar';
+import PageBackButton from '../../components/PageBackButton';
 
 type AdminModulePageProps = {
   title: string;
@@ -25,22 +25,19 @@ export default function AdminModulePage({ title, description }: AdminModulePageP
         />
 
         <main className="max-w-3xl mx-auto py-16">
+          <div className="mb-6">
+            <PageBackButton onClick={() => navigate('/dashboard')} label="Back to Admin Dashboard" />
+          </div>
+
           <div className="rounded-3xl border border-gray-300 bg-[#efefef] p-8 shadow-sm">
             <p className="text-slate-500 text-sm font-semibold uppercase tracking-[0.25em] mb-3">Module</p>
             <h2 className="text-3xl font-bold mb-3 text-black">{title}</h2>
             <p className="text-slate-700 leading-7 mb-8">{description}</p>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="inline-flex items-center gap-2 rounded-xl bg-black px-5 py-3 text-white font-semibold hover:bg-slate-800 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Admin Dashboard
-            </button>
           </div>
         </main>
 
         <footer className="py-12 text-center">
-          <p className="text-gray-500 text-sm">Trusted globally by over 3,000+ companies</p>
+          <p className="text-slate-500 text-xs">© 2026 Student Services. All rights reserved.</p>
         </footer>
       </div>
     </div>

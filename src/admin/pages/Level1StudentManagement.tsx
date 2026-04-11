@@ -1,7 +1,13 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, Calendar, Search, Users, X } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
+import { Calendar, Search, Users, X, Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import AppNavbar from '../../components/AppNavbar';
+import PageBackButton from '../../components/PageBackButton';
+import { getLevel1StudentRecords } from '../../app/data/level1StudentRegistry';
+import { attendanceService } from '../../features/attendance/attendanceService';
+import { studentService } from '../../features/students/studentService';
+import { useAuth } from '../../features/auth/AuthProvider';
 
 interface Student {
   id: number;
@@ -21,50 +27,127 @@ interface AttendanceRecord {
 }
 
 export default function Level1StudentManagement() {
+  const navigate = useNavigate();
+  const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
-  const [students, setStudents] = useState<Student[]>([
-    { id: 1, studentId: 'STU001', name: 'Adeyemi Okafor', campus: 'Lagos Island', level: 'Level 1', email: 'adeyemi@bibleschool.edu', enrollmentDate: 'Jan 15, 2026' },
-    { id: 2, studentId: 'STU002', name: 'Chioma Nwosu', campus: 'Lagos Mainland', level: 'Level 1', email: 'chioma@bibleschool.edu', enrollmentDate: 'Jan 20, 2026' },
-    { id: 3, studentId: 'STU003', name: 'David Akin', campus: 'Lagos Island', level: 'Level 1', email: 'david@bibleschool.edu', enrollmentDate: 'Feb 1, 2026' },
-    { id: 4, studentId: 'STU004', name: 'Grace Nnaji', campus: 'Lagos Mainland', level: 'Level 1', email: 'grace@bibleschool.edu', enrollmentDate: 'Feb 5, 2026' },
-    { id: 5, studentId: 'STU005', name: 'Moses Daniel', campus: 'Lagos Island', level: 'Level 1', email: 'moses@bibleschool.edu', enrollmentDate: 'Feb 10, 2026' },
-    { id: 6, studentId: 'STU006', name: 'Ruth Peter', campus: 'Lagos Mainland', level: 'Level 1', email: 'ruth@bibleschool.edu', enrollmentDate: 'Feb 15, 2026' },
-    { id: 7, studentId: 'STU007', name: 'Samuel Okafor', campus: 'Lagos Island', level: 'Level 1', email: 'samuel@bibleschool.edu', enrollmentDate: 'Mar 1, 2026' },
-    { id: 8, studentId: 'STU008', name: 'Tunde Lawal', campus: 'Lagos Mainland', level: 'Level 1', email: 'tunde@bibleschool.edu', enrollmentDate: 'Mar 5, 2026' },
-  ]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendanceByStudent, setAttendanceByStudent] = useState<Record<string, AttendanceRecord[]>>({});
 
-  // Sample attendance data for each student
-  const getAttendanceHistory = (studentId: string): AttendanceRecord[] => {
-    const baseData: Record<string, AttendanceRecord[]> = {
-      'STU001': [
-        { date: 'Apr 6, 2026', session: 'Morning Session', status: 'present', volunteer: 'Adebayo Lawal' },
-        { date: 'Mar 30, 2026', session: 'Morning Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 23, 2026', session: 'Morning Session', status: 'absent', volunteer: 'David Akin' },
-        { date: 'Mar 16, 2026', session: 'Morning Session', status: 'present', volunteer: 'Ruth Okafor' },
-        { date: 'Mar 9, 2026', session: 'Morning Session', status: 'present', volunteer: 'Moses Daniel' },
-      ],
-      'STU002': [
-        { date: 'Apr 6, 2026', session: 'Morning Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 30, 2026', session: 'Morning Session', status: 'absent', volunteer: 'Adebayo Lawal' },
-        { date: 'Mar 23, 2026', session: 'Morning Session', status: 'present', volunteer: 'David Akin' },
-        { date: 'Mar 16, 2026', session: 'Morning Session', status: 'present', volunteer: 'Ruth Okafor' },
-      ],
-      'STU003': [
-        { date: 'Apr 6, 2026', session: 'Morning Session', status: 'absent', volunteer: 'David Akin' },
-        { date: 'Mar 30, 2026', session: 'Morning Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 23, 2026', session: 'Morning Session', status: 'absent', volunteer: 'Adebayo Lawal' },
-      ],
-      'STU004': [
-        { date: 'Apr 6, 2026', session: 'Morning Session', status: 'present', volunteer: 'Ruth Okafor' },
-        { date: 'Mar 30, 2026', session: 'Morning Session', status: 'present', volunteer: 'Moses Daniel' },
-        { date: 'Mar 23, 2026', session: 'Morning Session', status: 'present', volunteer: 'Grace Nnaji' },
-        { date: 'Mar 16, 2026', session: 'Morning Session', status: 'absent', volunteer: 'David Akin' },
-        { date: 'Mar 9, 2026', session: 'Morning Session', status: 'present', volunteer: 'Adebayo Lawal' },
-      ],
+  useEffect(() => {
+    if (!session || session.role !== 'admin') {
+      navigate('/');
+    }
+  }, [navigate, session]);
+
+
+  const [newStudent, setNewStudent] = useState({
+    studentId: '',
+    name: '',
+    campus: 'Lagos Island' as 'Lagos Island' | 'Lagos Mainland',
+  });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadStudents = async () => {
+      try {
+        const registryStudents: Student[] = getLevel1StudentRecords().map((student) => ({
+          ...student,
+          email: '',
+          enrollmentDate: '',
+        }));
+        const persistedLevel1Students = await studentService.listStudentsByLevel('Level 1');
+        const mergedByStudentId = new Map<string, Student>();
+
+        for (const student of registryStudents) {
+          mergedByStudentId.set(student.studentId, student);
+        }
+
+        for (const student of persistedLevel1Students) {
+          mergedByStudentId.set(student.studentId, student);
+        }
+
+        if (mounted) {
+          setStudents(Array.from(mergedByStudentId.values()));
+        }
+      } catch (error) {
+        console.error('Error loading Level 1 students:', error);
+      }
     };
-    return baseData[studentId] || [];
+
+    void loadStudents();
+    const unsubscribe = studentService.subscribe(() => {
+      void loadStudents();
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAttendance = async () => {
+      try {
+        const allAttendance = await attendanceService.listAttendanceRecords();
+        const byStudent = allAttendance.reduce<Record<string, AttendanceRecord[]>>((acc, record) => {
+          const entry: AttendanceRecord = {
+            date: record.date,
+            session: record.session,
+            status: record.status,
+            volunteer: record.volunteer,
+          };
+
+          if (!acc[record.studentId]) {
+            acc[record.studentId] = [];
+          }
+
+          acc[record.studentId].push(entry);
+          return acc;
+        }, {});
+
+        if (mounted) {
+          setAttendanceByStudent(byStudent);
+        }
+      } catch (error) {
+        console.error('Error loading Level 1 attendance records:', error);
+      }
+    };
+
+    const handleWindowFocus = () => {
+      void loadAttendance();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void loadAttendance();
+      }
+    };
+
+    void loadAttendance();
+    const unsubscribe = attendanceService.subscribe(() => {
+      void loadAttendance();
+    });
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  const getAttendanceHistory = (studentId: string): AttendanceRecord[] => {
+    return attendanceByStudent[studentId] || [];
   };
 
   const filteredStudents = useMemo(() => {
@@ -89,6 +172,71 @@ export default function Level1StudentManagement() {
     return { present, total, rate };
   };
 
+  const handleAddStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    const idExists = students.some((s) => s.studentId.toLowerCase() === newStudent.studentId.trim().toLowerCase());
+    if (idExists) {
+      toast.error('Student ID already exists');
+      return;
+    }
+
+    const created: Student = {
+      id: Date.now(),
+      studentId: newStudent.studentId.trim().toUpperCase(),
+      name: newStudent.name.trim(),
+      campus: newStudent.campus,
+      level: 'Level 1',
+      email: '',
+      enrollmentDate: '',
+    };
+    setStudents((prev) => [created, ...prev]);
+    void studentService.saveStudent({
+      ...created,
+      email: '',
+      enrollmentDate: '',
+    });
+    setNewStudent({ studentId: '', name: '', campus: 'Lagos Island' });
+    setShowAddForm(false);
+    toast.success(`✓ Student ${created.name} added`);
+  };
+
+  const handleUpdateStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+
+    const idExists = students.some((s) => s.studentId.toLowerCase() === editingStudent.studentId.trim().toLowerCase() && s.id !== editingStudent.id);
+    if (idExists) {
+      toast.error('Student ID already exists');
+      return;
+    }
+
+
+    setStudents((prev) => prev.map((s) => (s.id === editingStudent.id ? editingStudent : s)));
+    setSelectedStudent(editingStudent);
+    setIsEditMode(false);
+    setEditingStudent(null);
+    void studentService.saveStudent({
+      ...editingStudent,
+      email: editingStudent.email ?? '',
+      enrollmentDate: editingStudent.enrollmentDate ?? '',
+    });
+    toast.success(`✓ Student ${editingStudent.name} updated`);
+  };
+
+  const handleDeleteStudent = (student: Student) => {
+    if (confirm(`Are you sure you want to delete ${student.name}? This action cannot be undone.`)) {
+      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+      setSelectedStudent(null);
+      toast.success(`✓ Student ${student.name} deleted`);
+      void studentService.deleteStudent(student.id);
+    }
+  };
+
+  const startEdit = (student: Student) => {
+    setEditingStudent({ ...student });
+    setIsEditMode(true);
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 antialiased">
       <Toaster position="top-right" richColors />
@@ -97,7 +245,11 @@ export default function Level1StudentManagement() {
           <AppNavbar ctaHref="/admin#/dashboard" />
         </div>
 
-        <div className="mb-12">
+        <div className="mb-8">
+          <PageBackButton onClick={() => window.history.back()} />
+        </div>
+
+        <div className="mb-10">
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-black mb-4">
             Level 1: Attendance Records
           </h1>
@@ -106,6 +258,66 @@ export default function Level1StudentManagement() {
             <br className="hidden sm:block" />
             to see their detailed attendance history and session participation.
           </p>
+        </div>
+
+        {/* Add New Student Section */}
+        <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Plus className="w-5 h-5 text-slate-700" />
+            <h2 className="text-xl font-bold text-slate-900">{showAddForm ? 'Add New Student' : 'Add New Student'}</h2>
+          </div>
+          {!showAddForm ? (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-4 py-2 rounded-lg bg-black hover:bg-gray-900 text-white text-sm font-semibold transition-colors"
+            >
+              + Add Student
+            </button>
+          ) : (
+            <form onSubmit={handleAddStudent} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <input
+                required
+                value={newStudent.studentId}
+                onChange={(e) => setNewStudent((prev) => ({ ...prev, studentId: e.target.value }))}
+                placeholder="Student ID"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+              />
+              <input
+                required
+                value={newStudent.name}
+                onChange={(e) => setNewStudent((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Full name"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-400 focus:outline-none transition-colors"
+              />
+
+              <select
+                value={newStudent.campus}
+                onChange={(e) => setNewStudent((prev) => ({ ...prev, campus: e.target.value as 'Lagos Island' | 'Lagos Mainland' }))}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none transition-colors"
+              >
+                <option>Lagos Island</option>
+                <option>Lagos Mainland</option>
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 rounded-xl bg-black hover:bg-gray-900 text-white text-sm font-semibold px-4 py-3 transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setNewStudent({ studentId: '', name: '', campus: 'Lagos Island' });
+                  }}
+                  className="flex-1 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold px-4 py-3 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Search Section */}
@@ -157,17 +369,6 @@ export default function Level1StudentManagement() {
               <p className="text-slate-600 font-medium">No student records found.</p>
             </div>
           )}
-        </div>
-
-        {/* Back Button */}
-        <div className="text-center pb-12">
-          <button
-            onClick={() => window.history.back()}
-            className="inline-flex items-center gap-2 rounded-lg bg-black hover:bg-gray-900 text-white px-6 py-3 text-sm font-bold transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
         </div>
       </div>
 
@@ -237,7 +438,7 @@ export default function Level1StudentManagement() {
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-200">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                   <div>
                     <p className="text-sm font-medium text-slate-700">Overall Attendance</p>
                     <p className="text-2xl font-bold text-slate-900">
@@ -251,11 +452,96 @@ export default function Level1StudentManagement() {
                     </p>
                   </div>
                 </div>
+
+                <div className="flex gap-2 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={() => startEdit(selectedStudent)}
+                    className="flex-1 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteStudent(selectedStudent)}
+                    className="flex-1 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Edit Student Modal */}
+      {isEditMode && editingStudent && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={() => setIsEditMode(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-black p-6 rounded-t-2xl sticky top-0">
+              <h2 className="text-white text-2xl font-bold">Edit Student</h2>
+            </div>
+
+            <form onSubmit={handleUpdateStudent} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Student ID</label>
+                <input
+                  required
+                  value={editingStudent.studentId}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, studentId: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 focus:border-slate-400 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Full Name</label>
+                <input
+                  required
+                  value={editingStudent.name}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 focus:border-slate-400 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Campus</label>
+                <select
+                  value={editingStudent.campus}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, campus: e.target.value as 'Lagos Island' | 'Lagos Mainland' })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 focus:border-slate-400 focus:outline-none transition-colors"
+                >
+                  <option>Lagos Island</option>
+                  <option>Lagos Mainland</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-6 border-t border-slate-200">
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 rounded-lg bg-black hover:bg-gray-900 text-white font-semibold transition-colors"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(false)}
+                  className="flex-1 px-6 py-3 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

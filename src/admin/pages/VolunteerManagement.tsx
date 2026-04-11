@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Calendar, Shield, UserPlus, X } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import AppNavbar from '../../components/AppNavbar';
+import PageBackButton from '../../components/PageBackButton';
+import * as persistence from '../../utils/persistence';
 
 type VolunteerStatus = 'active' | 'inactive';
 
@@ -33,6 +36,7 @@ interface VolunteerActivity {
 }
 
 export default function VolunteerManagement() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
 
@@ -54,6 +58,35 @@ export default function VolunteerManagement() {
     { id: 101, name: 'Moses Daniel', email: 'moses.daniel@bibleschool.edu', campus: 'Lagos Island', requestedAt: 'Apr 6, 2026 08:12 AM' },
     { id: 102, name: 'Chioma Peter', email: 'chioma.peter@bibleschool.edu', campus: 'Lagos Mainland', requestedAt: 'Apr 6, 2026 09:02 AM' },
   ]);
+
+  // Load volunteers from IndexedDB on mount
+  useEffect(() => {
+    const loadVolunteers = async () => {
+      try {
+        const savedVolunteers = await persistence.getAllVolunteers();
+        if (savedVolunteers.length > 0) {
+          setVolunteers(savedVolunteers);
+        }
+      } catch (error) {
+        console.error('Error loading volunteers from IndexedDB:', error);
+      }
+    };
+    loadVolunteers();
+  }, []);
+
+  // Save volunteers to IndexedDB whenever they change
+  useEffect(() => {
+    const saveAllVolunteers = async () => {
+      try {
+        for (const volunteer of volunteers) {
+          await persistence.saveVolunteer(volunteer);
+        }
+      } catch (error) {
+        console.error('Error saving volunteers to IndexedDB:', error);
+      }
+    };
+    saveAllVolunteers();
+  }, [volunteers]);
 
   const getVolunteerActivity = (volunteerId: string): VolunteerActivity[] => {
     const baseData: Record<string, VolunteerActivity[]> = {
@@ -160,12 +193,49 @@ export default function VolunteerManagement() {
     }
   };
 
+  const handleDeactivateVolunteer = (volunteer: Volunteer) => {
+    setVolunteers((prev) =>
+      prev.map((v) =>
+        v.id === volunteer.id ? { ...v, status: v.status === 'active' ? 'inactive' : 'active' } : v
+      )
+    );
+    const newStatus = volunteer.status === 'active' ? 'inactive' : 'active';
+    toast.success(`${volunteer.name} is now ${newStatus}`);
+    setSelectedVolunteer((prev) =>
+      prev ? { ...prev, status: newStatus as VolunteerStatus } : null
+    );
+  };
+
+  const handleResetPassword = (volunteer: Volunteer) => {
+    setVolunteers((prev) =>
+      prev.map((v) =>
+        v.id === volunteer.id
+          ? { ...v, passwordLastUpdated: 'Today', mustChangePassword: true }
+          : v
+      )
+    );
+    toast.success(`Password reset for ${volunteer.name}. They must change it on next login.`);
+    setSelectedVolunteer((prev) =>
+      prev
+        ? {
+            ...prev,
+            passwordLastUpdated: 'Today',
+            mustChangePassword: true,
+          }
+        : null
+    );
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 antialiased">
       <Toaster position="top-right" richColors />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
           <AppNavbar ctaHref="/admin#/dashboard" />
+        </div>
+
+        <div className="mb-8">
+          <PageBackButton onClick={() => navigate('/dashboard')} label="Back to Dashboard" />
         </div>
 
         <div className="mb-10">
@@ -361,7 +431,7 @@ export default function VolunteerManagement() {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-200">
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center mb-4">
                     <div>
                       <p className="text-sm font-medium text-slate-700">Total Sessions</p>
                       <p className="text-2xl font-bold text-slate-900">
@@ -374,6 +444,25 @@ export default function VolunteerManagement() {
                         {getActivityStats(selectedVolunteer.volunteerId).lastActivity}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4 border-t border-slate-200">
+                    <button
+                      onClick={() => handleResetPassword(selectedVolunteer)}
+                      className="flex-1 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors"
+                    >
+                      Reset Password
+                    </button>
+                    <button
+                      onClick={() => handleDeactivateVolunteer(selectedVolunteer)}
+                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        selectedVolunteer.status === 'active'
+                          ? 'bg-red-500 hover:bg-red-600 text-white'
+                          : 'bg-green-500 hover:bg-green-600 text-white'
+                      }`}
+                    >
+                      {selectedVolunteer.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                    </button>
                   </div>
                 </div>
               </div>

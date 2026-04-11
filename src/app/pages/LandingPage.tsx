@@ -30,14 +30,14 @@ export default function LandingPage() {
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={() => navigate('/attendance-portal')}
-              className="w-full sm:w-auto px-10 py-3.5 rounded-md bg-orange-500 hover:bg-orange-600 text-white font-bold text-base transition-all active:scale-95"
+              className="w-full sm:w-auto px-10 py-3.5 rounded-md bg-orange-500 hover:bg-orange-600 text-white font-bold text-base transition-all active:scale-95 cursor-pointer"
             >
               Get started
             </button>
             
             <button
               onClick={() => window.location.assign('/admin.html')}
-              className="w-full sm:w-auto px-10 py-3.5 rounded-md border border-gray-300 bg-white text-gray-700 font-bold text-base hover:bg-gray-50 transition-all active:scale-95"
+              className="w-full sm:w-auto px-10 py-3.5 rounded-md border border-gray-300 bg-white text-gray-700 font-bold text-base hover:bg-gray-50 transition-all active:scale-95 cursor-pointer"
             >
               Learn more
             </button>

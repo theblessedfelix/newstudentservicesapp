@@ -1,9 +1,41 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Shield, ArrowRight } from 'lucide-react';
 import AppNavbar from '../../components/AppNavbar';
+import { useAuth } from '../../features/auth/AuthProvider';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const { session, signInWithRole } = useAuth();
+  const [adminId, setAdminId] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (session?.role === 'admin') {
+      navigate('/dashboard');
+    }
+  }, [navigate, session]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setIsSubmitting(true);
+
+    try {
+      await signInWithRole({
+        identifier: adminId.trim(),
+        password,
+        role: 'admin',
+      });
+      navigate('/dashboard');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f2f2f5] text-slate-900 antialiased">
@@ -35,18 +67,38 @@ export default function AdminLogin() {
               Sign in to manage records, process approvals, run reports, and maintain ID collection workflows.
             </p>
 
-            <div className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <input
+                type="text"
+                value={adminId}
+                onChange={(e) => setAdminId(e.target.value)}
+                placeholder="Admin ID"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-800 focus:border-black focus:outline-none"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-slate-800 focus:border-black focus:outline-none"
+              />
               <div className="rounded-xl border border-gray-300 bg-white p-4 text-sm text-slate-600">
-                Demo access is intentionally kept simple in this UI bundle.
+                Temporary admin login 
               </div>
+              {errorMessage && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  {errorMessage}
+                </p>
+              )}
               <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full rounded-xl bg-black px-5 py-3 text-white font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-xl bg-black px-5 py-3 text-white font-semibold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                Enter Admin Dashboard
+                {isSubmitting ? 'Signing In...' : 'Enter Admin Dashboard'}
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>

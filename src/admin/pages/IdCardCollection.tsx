@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import AppNavbar from '../../components/AppNavbar';
+import PageBackButton from '../../components/PageBackButton';
+import { studentService } from '../../features/students/studentService';
+import { useAuth } from '../../features/auth/AuthProvider';
 
 interface Student {
   id: number;
@@ -10,16 +14,64 @@ interface Student {
   status: 'N/A' | 'COLLECTED' | 'PENDING' | 'NOT PRODUCED';
 }
 
+interface PersistedStudent {
+  id: number;
+  name: string;
+  studentId: string;
+  campus: string;
+  level: string;
+}
+
 export default function IdCardCollection() {
+  const navigate = useNavigate();
+  const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COLLECTED' | 'PENDING'>('ALL');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
 
-  const [students, setStudents] = useState<Student[]>([
-    { id: 1, name: 'Jane Doe', studentId: 'STU001', campus: 'Lagos Island', level: 'Level 1', status: 'N/A' },
-    { id: 2, name: 'Jane Doe', studentId: 'STU002', campus: 'Lagos Mainland', level: 'Level 2', status: 'COLLECTED' },
-    { id: 3, name: 'Jane Doe', studentId: 'STU003', campus: 'Lagos Island', level: 'Level 1', status: 'PENDING' },
-  ]);
+  useEffect(() => {
+    if (!session || session.role !== 'admin') {
+      navigate('/');
+    }
+  }, [navigate, session]);
+
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadStudents = async () => {
+      try {
+        const persistedStudents = await studentService.listStudents();
+        const normalized = (persistedStudents as PersistedStudent[])
+          .map((student) => ({
+            id: student.id,
+            name: student.name,
+            studentId: student.studentId,
+            campus: student.campus,
+            level: student.level,
+            status: 'PENDING' as const,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (mounted) {
+          setStudents(normalized);
+        }
+      } catch (error) {
+        console.error('Failed to load students for ID card collection', error);
+      }
+    };
+
+    void loadStudents();
+    const unsubscribe = studentService.subscribe(() => {
+      void loadStudents();
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -40,11 +92,27 @@ export default function IdCardCollection() {
     setSelectedStudent(null);
   };
 
+  const getStatusChipClass = (status: Student['status']) => {
+    if (status === 'COLLECTED') return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+    if (status === 'PENDING') return 'bg-amber-100 text-amber-800 border border-amber-200';
+    return 'bg-slate-100 text-slate-700 border border-slate-200';
+  };
+
+  const getStatusButtonClass = (status: Student['status']) => {
+    if (status === 'COLLECTED') return 'bg-emerald-700 hover:bg-emerald-800';
+    if (status === 'PENDING') return 'bg-amber-600 hover:bg-amber-700';
+    return 'bg-slate-700 hover:bg-slate-800';
+  };
+
   return (
-    <div className="min-h-screen bg-[#f6f3ee] text-slate-900 antialiased">
+    <div className="min-h-screen bg-[#f2f2f5] text-slate-900 antialiased">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
           <AppNavbar ctaHref="/admin#/dashboard" />
+        </div>
+
+        <div className="mb-8">
+          <PageBackButton onClick={() => navigate('/dashboard')} label="Back to Dashboard" />
         </div>
 
         <div className="mb-10">
@@ -58,44 +126,46 @@ export default function IdCardCollection() {
           </p>
         </div>
 
-        <div className="flex flex-col lg:flex-row items-start gap-6 mb-10">
-          <div className="w-full lg:flex-1">
-            <input
-              type="text"
-              placeholder="Search by name or student ID"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-14 px-6 rounded-xl border border-[#d4cfc6] bg-white text-center text-lg sm:text-xl font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-slate-500 transition-colors"
-            />
-          </div>
+        <div className="mb-10 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-col lg:flex-row items-start gap-6">
+            <div className="w-full lg:flex-1">
+              <input
+                type="text"
+                placeholder="Search by name or student ID"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 transition-colors"
+              />
+            </div>
 
-          <div className="w-full lg:w-auto">
-            <p className="text-sm font-medium text-slate-700 mb-3">Filter by status</p>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setStatusFilter('ALL')}
-                className={`h-10 min-w-24 rounded-lg px-4 text-xs font-bold tracking-widest uppercase transition-colors ${
-                  statusFilter === 'ALL' ? 'bg-[#3f3a34] text-white' : 'bg-[#1f1f1f] text-white hover:bg-[#2f2f2f]'
-                }`}
-              >
-                All ({students.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter('COLLECTED')}
-                className={`h-10 min-w-28 rounded-lg px-4 text-xs font-bold tracking-widest uppercase transition-colors ${
-                  statusFilter === 'COLLECTED' ? 'bg-emerald-700 text-white' : 'bg-[#1f1f1f] text-white hover:bg-[#2f2f2f]'
-                }`}
-              >
-                Collected {collectedCount > 0 ? `(${collectedCount})` : ''}
-              </button>
-              <button
-                onClick={() => setStatusFilter('PENDING')}
-                className={`h-10 min-w-28 rounded-lg px-4 text-xs font-bold tracking-widest uppercase transition-colors ${
-                  statusFilter === 'PENDING' ? 'bg-amber-600 text-white' : 'bg-[#1f1f1f] text-white hover:bg-[#2f2f2f]'
-                }`}
-              >
-                Pending {pendingCount > 0 ? `(${pendingCount})` : ''}
-              </button>
+            <div className="w-full lg:w-auto">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Filter by status</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setStatusFilter('ALL')}
+                  className={`h-10 min-w-24 rounded-lg px-4 text-xs font-bold tracking-widest uppercase transition-colors cursor-pointer ${
+                    statusFilter === 'ALL' ? 'bg-black text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  All ({students.length})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('COLLECTED')}
+                  className={`h-10 min-w-28 rounded-lg px-4 text-xs font-bold tracking-widest uppercase transition-colors cursor-pointer ${
+                    statusFilter === 'COLLECTED' ? 'bg-emerald-700 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Collected {collectedCount > 0 ? `(${collectedCount})` : ''}
+                </button>
+                <button
+                  onClick={() => setStatusFilter('PENDING')}
+                  className={`h-10 min-w-28 rounded-lg px-4 text-xs font-bold tracking-widest uppercase transition-colors cursor-pointer ${
+                    statusFilter === 'PENDING' ? 'bg-amber-600 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Pending {pendingCount > 0 ? `(${pendingCount})` : ''}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -105,14 +175,15 @@ export default function IdCardCollection() {
             <div 
               key={student.id} 
               onClick={() => setSelectedStudent(student)}
-              className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[72px_minmax(180px,1fr)_130px_150px_110px_120px] items-center gap-4 sm:gap-6 bg-white border border-[#d9d4cb] rounded-2xl px-4 sm:px-8 py-4 cursor-pointer hover:border-[#c8c1b5] hover:shadow-sm transition-all"
+              className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[72px_minmax(180px,1fr)_130px_150px_110px_120px] items-center gap-4 sm:gap-6 bg-white border border-slate-200 rounded-2xl px-4 sm:px-8 py-4 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
             >
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black flex items-center justify-center text-white font-bold text-xs">
                 {getInitials(student.name)}
               </div>
 
               <div className="min-w-0">
-                <p className="text-xl sm:text-2xl font-semibold text-black leading-tight">{student.name}</p>
+                <p className="text-lg sm:text-xl font-semibold text-black leading-tight">{student.name}</p>
+                <p className="sm:hidden mt-1 text-xs text-slate-500">{student.studentId} • {student.campus} • {student.level}</p>
               </div>
 
               <p className="hidden sm:block text-sm font-medium uppercase tracking-wide text-slate-800">{student.studentId}</p>
@@ -125,13 +196,7 @@ export default function IdCardCollection() {
                     e.stopPropagation();
                     setSelectedStudent(student);
                   }}
-                  className={`h-9 min-w-24 rounded-lg text-white text-xs sm:text-sm font-semibold px-4 transition-colors ${
-                    student.status === 'COLLECTED'
-                      ? 'bg-emerald-700 hover:bg-emerald-800'
-                      : student.status === 'PENDING'
-                      ? 'bg-amber-600 hover:bg-amber-700'
-                      : 'bg-[#1f1f1f] hover:bg-[#2f2f2f]'
-                  }`}
+                  className={`h-9 min-w-24 rounded-lg text-xs sm:text-sm font-semibold px-4 transition-colors cursor-pointer ${getStatusChipClass(student.status)}`}
                 >
                   {student.status}
                 </button>
@@ -140,14 +205,14 @@ export default function IdCardCollection() {
           ))}
 
           {filteredStudents.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-2xl border border-[#d9d4cb]">
+            <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
               <p className="text-slate-600 font-medium">No records found for this search/filter combination.</p>
             </div>
           )}
         </div>
 
         <footer className="py-8 text-center">
-          <p className="text-gray-500 text-sm">Trusted globally by over 3,000+ companies</p>
+          <p className="text-slate-500 text-xs">© 2026 Student Services. All rights reserved.</p>
         </footer>
       </div>
 
@@ -176,19 +241,19 @@ export default function IdCardCollection() {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Update Record</label>
                 <button 
                   onClick={() => handleStatusChange(selectedStudent.id, 'COLLECTED')} 
-                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all active:scale-95"
+                  className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold transition-all active:scale-95 cursor-pointer"
                 >
                   Mark as Collected
                 </button>
                 <button 
                   onClick={() => handleStatusChange(selectedStudent.id, 'PENDING')} 
-                  className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold transition-all active:scale-95"
+                  className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold transition-all active:scale-95 cursor-pointer"
                 >
                   Mark as Pending
                 </button>
                 <button 
                   onClick={() => handleStatusChange(selectedStudent.id, 'N/A')} 
-                  className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all active:scale-95"
+                  className="w-full py-3 bg-slate-700 hover:bg-slate-800 text-white rounded-xl font-bold transition-all active:scale-95 cursor-pointer"
                 >
                   Mark as Not Available (N/A)
                 </button>

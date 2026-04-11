@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import AppNavbar from '../../components/AppNavbar';
+import PageBackButton from '../../components/PageBackButton';
 
 export default function StudentRecordsChoice() {
   const navigate = useNavigate();
@@ -10,6 +11,10 @@ export default function StudentRecordsChoice() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-16">
           <AppNavbar ctaHref="/admin#/dashboard" />
+        </div>
+
+        <div className="mb-8">
+          <PageBackButton onClick={() => navigate('/dashboard')} label="Back to Dashboard" />
         </div>
 
         <div className="text-center mb-16">
@@ -27,7 +32,7 @@ export default function StudentRecordsChoice() {
           {/* Level 1 Card */}
           <button
             onClick={() => navigate('/students/level-1')}
-            className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-8 hover:border-black hover:shadow-lg transition-all duration-200"
+            className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-8 hover:border-black hover:shadow-lg transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 group-hover:bg-black transition-colors mb-6">
               <span className="text-2xl font-bold text-slate-600 group-hover:text-white transition-colors">1</span>
@@ -45,7 +50,7 @@ export default function StudentRecordsChoice() {
           {/* Level 2 Card */}
           <button
             onClick={() => navigate('/students/level-2')}
-            className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-8 hover:border-black hover:shadow-lg transition-all duration-200"
+            className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-8 hover:border-black hover:shadow-lg transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 group-hover:bg-black transition-colors mb-6">
               <span className="text-2xl font-bold text-slate-600 group-hover:text-white transition-colors">2</span>

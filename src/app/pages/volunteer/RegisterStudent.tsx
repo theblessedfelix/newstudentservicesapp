@@ -1,25 +1,60 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, UserPlus, User, GraduationCap, MapPin } from 'lucide-react';
+import { toast, Toaster } from 'sonner';
 import AppNavbar from '../../../components/AppNavbar';
+import { approvalService } from '../../../features/approvals/approvalService';
+import { useAuth } from '../../../features/auth/AuthProvider';
 
 export default function RegisterStudent() {
   const navigate = useNavigate();
+  const { session } = useAuth();
+
+  useEffect(() => {
+    if (!session || session.role !== 'volunteer') {
+      navigate('/volunteer');
+    }
+  }, [navigate, session]);
+
   const [formData, setFormData] = useState({
     studentId: '',
     name: '',
     level: '',
     campus: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Student registration submitted for admin approval!');
-    navigate('/volunteer/dashboard');
+    setIsSubmitting(true);
+
+    try {
+      await approvalService.createApprovalRequest({
+        id: Date.now(),
+        studentId: formData.studentId.trim().toUpperCase(),
+        name: formData.name.trim(),
+        email: `${formData.studentId.trim().toLowerCase()}@pending.local`,
+        campus: formData.campus === 'lagos_mainland' ? 'Lagos Mainland' : 'Lagos Island',
+        level: formData.level === 'level2' ? 'Level 2' : 'Level 1',
+        parentGuardian: 'N/A',
+        parentPhone: 'N/A',
+        notes: 'Submitted from volunteer registration page',
+        submittedBy: session?.displayName ?? session?.identifier ?? 'Volunteer',
+        submittedAt: new Date().toLocaleString('en-US'),
+        status: 'pending',
+      });
+      toast.success('Student registration submitted for admin approval');
+      navigate('/volunteer/dashboard');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to submit registration');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#f8f9fb] font-sans antialiased text-slate-800">
+      <Toaster position="top-right" richColors />
       <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <AppNavbar ctaHref="/volunteer" />
       </div>
@@ -148,9 +183,10 @@ export default function RegisterStudent() {
               </button>
               <button
                 type="submit"
-                className="flex-1 order-1 sm:order-2 bg-slate-900 text-white py-3 px-6 rounded-xl font-bold text-[13px] hover:bg-black transition-all active:scale-[0.98] shadow-sm shadow-slate-200"
+                disabled={isSubmitting}
+                className="flex-1 order-1 sm:order-2 bg-slate-900 text-white py-3 px-6 rounded-xl font-bold text-[13px] hover:bg-black transition-all active:scale-[0.98] shadow-sm shadow-slate-200 disabled:opacity-60"
               >
-                Submit Entry
+                {isSubmitting ? 'Submitting...' : 'Submit Entry'}
               </button>
             </div>
           </form>

@@ -30,6 +30,7 @@ export const router = createBrowserRouter([
       { path: "student-records-choice", Component: StudentRecordsChoice },
       { path: "register", Component: RegisterStudent },
       { path: "history", Component: ViewHistory },
+      { path: "history/:levelId", Component: ViewHistory },
     ],
   },
 ]);

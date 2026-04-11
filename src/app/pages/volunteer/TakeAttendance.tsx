@@ -1,103 +1,304 @@
-import { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router';
-import { BookOpen, ArrowLeft, User, CheckCircle, Calendar, Clock, QrCode, TrendingUp, X, Mail, Phone, Sun, Moon, Search } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router';
+import { ArrowLeft, ArrowRight, Clock, QrCode, TrendingUp, Search, CheckCircle, User, X, Lock, AlertCircle } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import {
+  ATTENDANCE_LEVELS,
+  ATTENDANCE_LEVEL_MAP,
+  isSessionActive,
+  getSessionTimeRemaining,
+  type AttendanceDayConfig,
+  type AttendanceDayId,
+  type DayOfWeek,
+  type AttendanceLevelConfig,
+  type AttendanceLevelId,
+  type AttendanceSession,
+  type AttendanceStudent,
+} from './attendanceConfig';
+import { approvalService } from '../../../features/approvals/approvalService';
+import { attendanceService } from '../../../features/attendance/attendanceService';
+import { useAuth } from '../../../features/auth/AuthProvider';
+import { sessionService } from '../../../features/sessions/sessionService';
 
-const THEME_STORAGE_KEY = 'volunteer-theme';
+type Step = 'level' | 'day' | 'session' | 'scanner';
 
-interface Student {
-  id: string;
-  name: string;
-  studentId: string;
-  initials: string;
-}
+type Student = AttendanceStudent;
 
 interface CheckedInStudent extends Student {
   checkInTime: string;
   sessionName: string;
-  animation: boolean;
+}
+
+function BrandHeader({ onBack, navigate }: { onBack: () => void; navigate: ReturnType<typeof useNavigate> }) {
+  return (
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-10">
+      <div className="rounded-xl border border-slate-300 bg-[#f2f2f5] px-5 py-2.5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} className="rounded-full border border-slate-300 bg-white p-2 text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer" aria-label="Go back">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button onClick={() => navigate('/volunteer/dashboard')} className="hidden sm:grid h-12 w-12 place-items-center rounded-full bg-slate-200 text-xl font-black text-black">
+              SP
+            </button>
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-900">
+            <span>Add new student</span>
+            <span>ID Collection</span>
+            <span>Volunteer Sign up</span>
+            <span>Knowledge Based</span>
+            <span>RHEMA Website</span>
+          </div>
+          <button className="rounded-md bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors">Get started</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LevelSelectionCard({ level, onSelect }: { level: AttendanceLevelConfig; onSelect: (levelId: AttendanceLevelId) => void }) {
+  return (
+    <button
+      onClick={() => onSelect(level.id)}
+      className="group relative w-full overflow-hidden rounded-xl border border-slate-300 bg-[#f2f2f5] px-8 py-8 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-400 cursor-pointer"
+    >
+      <div className="absolute inset-x-0 top-0 h-px bg-slate-200" />
+      <div className="mx-auto flex w-fit items-center gap-3 rounded-full border border-slate-300 bg-white px-3 py-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{level.shortLabel}</span>
+        <div className={level.cardVariant === 'editorial' ? 'h-3 w-3 rounded-sm bg-slate-300' : 'h-3 w-3 rounded-full bg-slate-300'} />
+      </div>
+      <div className={level.cardVariant === 'editorial' ? 'mx-auto mt-8 h-20 w-20 rounded-3xl bg-slate-200' : 'mx-auto mt-8 h-20 w-20 rounded-full bg-slate-300'} />
+      <h2 className="mt-6 text-3xl font-black text-black">{level.cardTitle}</h2>
+      <p className="mt-3 text-base md:text-lg font-medium text-slate-800">{level.cardDescription[0]}</p>
+      <p className="text-base md:text-lg font-medium text-slate-800">{level.cardDescription[1]}</p>
+      <div className="mt-8 flex items-center justify-center gap-3">
+        <span className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Proceed</span>
+        <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white transition-transform group-hover:translate-x-0.5">
+          <ArrowRight className="w-5 h-5" />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function SessionSelectionCard({
+  day,
+  session,
+  onSelect,
+}: {
+  day: AttendanceDayConfig;
+  session: AttendanceSession;
+  onSelect: (sessionName: string) => void;
+}) {
+  if (day.sessionVariant === 'feature') {
+    return (
+      <button
+        onClick={() => onSelect(session.name)}
+        className="group w-full rounded-xl border border-slate-300 bg-[#f2f2f5] p-8 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-400 cursor-pointer"
+      >
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+              Focus Block
+            </div>
+            <h2 className="mt-5 text-3xl font-black text-black">{session.name}</h2>
+            <p className="mt-2 text-base font-medium text-slate-700">{session.time}</p>
+            <p className="mt-5 max-w-md text-sm font-medium leading-6 text-slate-600">{session.description}</p>
+          </div>
+          <div className="h-16 w-16 rounded-2xl bg-slate-200" />
+        </div>
+
+        <div className="mt-8 flex items-center justify-between">
+          <span className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Open attendance</span>
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white transition-transform group-hover:translate-x-0.5">
+            <ArrowRight className="w-5 h-5" />
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => onSelect(session.name)}
+      className="group w-full rounded-xl border border-slate-300 bg-[#f2f2f5] p-8 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-400 cursor-pointer"
+    >
+      <div className="flex items-start justify-between gap-6">
+        <div>
+          <div className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            Session
+          </div>
+          <h2 className="mt-5 text-3xl font-black text-black">{session.name}</h2>
+          <p className="mt-2 text-base font-medium text-slate-700">{session.time}</p>
+          <p className="mt-5 max-w-xs text-sm font-medium leading-6 text-slate-600">{session.description}</p>
+        </div>
+        <div className="h-14 w-14 rounded-full bg-slate-200" />
+      </div>
+
+      <div className="mt-8 flex items-center justify-between">
+        <span className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Proceed</span>
+        <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white transition-transform group-hover:translate-x-0.5">
+          <ArrowRight className="w-5 h-5" />
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export default function TakeAttendance() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const session = location.state?.session || { name: 'Morning', time: '9:00 AM - 11:30 AM' };
-  const selectedLevel = location.state?.level || 'Level 1';
+  const { session } = useAuth();
 
-  const [idInput, setIdInput] = useState('');
-  const [checkedInStudents, setCheckedInStudents] = useState<CheckedInStudent[]>([]);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [countdownTime, setCountdownTime] = useState(7200); // 2 hours in seconds
-  const [selectedStudent, setSelectedStudent] = useState<CheckedInStudent | null>(null);
-  const [studentDataCache, setStudentDataCache] = useState<Record<string, any>>({});
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    return savedTheme ? savedTheme === 'dark' : true;
-  });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [confirmStudent, setConfirmStudent] = useState<Student | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Generate random attendance history (memoized per student)
-  const generateAttendanceHistory = (studentId: string) => {
-    if (studentDataCache[studentId]) {
-      return studentDataCache[studentId];
+  useEffect(() => {
+    if (!session || session.role !== 'volunteer') {
+      navigate('/volunteer');
+    }
+  }, [navigate, session]);
+  const initialLevel = (() => {
+    if (typeof window === 'undefined') {
+      return null;
     }
 
-    const sessions = ['Morning', 'Afternoon', 'Evening'];
-    const dates = [
-      'Apr 6, 2026',
-      'Apr 5, 2026',
-      'Apr 4, 2026',
-      'Apr 3, 2026',
-      'Apr 2, 2026',
-    ];
+    const levelFromUrl = new URLSearchParams(window.location.search).get('level');
+    return levelFromUrl === 'Level 1' || levelFromUrl === 'Level 2' ? levelFromUrl : null;
+  })();
+  const [currentStep, setCurrentStep] = useState<Step>('level');
+  const [selectedLevel, setSelectedLevel] = useState<AttendanceLevelId | null>(initialLevel);
+  const [selectedDay, setSelectedDay] = useState<AttendanceDayId | null>(null);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [idInput, setIdInput] = useState('');
+  const [checkedInStudents, setCheckedInStudents] = useState<CheckedInStudent[]>([]);
+  const [countdownTime, setCountdownTime] = useState(0); // Will be set based on session time remaining
+  const [searchQuery, setSearchQuery] = useState('');
+  const [unknownStudentModalOpen, setUnknownStudentModalOpen] = useState(false);
+  const [unknownStudentModalStep, setUnknownStudentModalStep] = useState<'confirm' | 'form'>('confirm');
+  const [unknownStudentId, setUnknownStudentId] = useState('');
+  const [unknownStudentName, setUnknownStudentName] = useState('');
+  const [unknownStudentCampus, setUnknownStudentCampus] = useState<'Lagos Island' | 'Lagos Mainland'>('Lagos Island');
+  const [submittingUnknownStudent, setSubmittingUnknownStudent] = useState(false);
+  const [quickLookupCandidate, setQuickLookupCandidate] = useState<Student | null>(null);
+  const [isSessionTimeLocked, setIsSessionTimeLocked] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selectedLevelConfig = selectedLevel ? ATTENDANCE_LEVEL_MAP[selectedLevel] : null;
+  const selectedDayConfig = selectedLevelConfig?.days.find((day) => day.id === selectedDay) ?? null;
+  const todayWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) as DayOfWeek | string;
+  const todayAttendanceDay = selectedLevelConfig?.days.find((day) => day.dayOfWeek === todayWeekday) ?? null;
+  const allStudents: Student[] = selectedLevelConfig ? selectedLevelConfig.getStudents() : [];
+  const studentsByLevel = useMemo(
+    () => ({
+      'Level 1': ATTENDANCE_LEVEL_MAP['Level 1'].getStudents(),
+      'Level 2': ATTENDANCE_LEVEL_MAP['Level 2'].getStudents(),
+    }),
+    [],
+  );
 
-    const data = {
-      phone: `+1 (555) ${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`,
-      history: dates.map((date) => ({
-        date,
-        session: sessions[Math.floor(Math.random() * sessions.length)],
-        status: Math.random() > 0.2 ? 'present' : 'absent',
-        time: Math.random() > 0.5 ? '9:15 AM' : '1:45 PM',
-      })),
+  const filteredStudents = useMemo(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      return [];
+    }
+
+    const lowerQuery = query.toLowerCase();
+
+    const ranked = allStudents
+      .map((student) => {
+        const studentId = student.studentId.toLowerCase();
+        const name = student.name.toLowerCase();
+
+        let rank = -1;
+        if (studentId.startsWith(lowerQuery)) {
+          rank = 0;
+        } else if (studentId.includes(lowerQuery)) {
+          rank = 1;
+        } else if (name.startsWith(lowerQuery)) {
+          rank = 2;
+        } else if (name.includes(lowerQuery)) {
+          rank = 3;
+        }
+
+        return { student, rank };
+      })
+      .filter((item) => item.rank !== -1)
+      .sort((a, b) => {
+        if (a.rank !== b.rank) {
+          return a.rank - b.rank;
+        }
+        return a.student.studentId.localeCompare(b.student.studentId, undefined, { numeric: true, sensitivity: 'base' });
+      })
+      .slice(0, 4)
+      .map((item) => item.student);
+
+    return ranked;
+  }, [allStudents, searchQuery]);
+
+  const selectedSessionLabel = useMemo(
+    () => [selectedDay, selectedSession].filter(Boolean).join(' - ') || 'Session',
+    [selectedDay, selectedSession],
+  );
+
+  useEffect(() => {
+    if (currentStep === 'scanner') inputRef.current?.focus();
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (countdownTime <= 0 || currentStep !== 'scanner') return;
+    
+    const interval = setInterval(() => {
+      setCountdownTime((prev) => {
+        const newTime = prev - 1;
+        if (newTime <= 0) {
+          setIsSessionTimeLocked(true);
+          toast.error('❌ Session time has ended. Scanner is now closed.');
+        }
+        return Math.max(0, newTime);
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [countdownTime, currentStep]);
+
+  useEffect(() => {
+    if (initialLevel) {
+      setCurrentStep('day');
+    }
+  }, [initialLevel]);
+
+  useEffect(() => {
+    if (currentStep !== 'day' || !todayAttendanceDay) {
+      return;
+    }
+
+    setSelectedDay(todayAttendanceDay.id);
+    setSelectedSession(null);
+    setCheckedInStudents([]);
+    setCurrentStep('session');
+  }, [currentStep, todayAttendanceDay]);
+
+  useEffect(() => {
+    if (currentStep !== 'scanner' || !selectedSessionLabel) {
+      return;
+    }
+
+    const hydrateCheckedInStudents = async () => {
+      const records = await attendanceService.listAttendanceRecords();
+      const currentSessionStudents = records
+        .filter((record) => record.session === selectedSessionLabel && record.status === 'present')
+        .map((record) => allStudents.find((student) => student.studentId === record.studentId))
+        .filter((student): student is Student => Boolean(student))
+        .map((student) => ({
+          ...student,
+          checkInTime: 'Live',
+          sessionName: selectedSessionLabel,
+        }));
+
+      setCheckedInStudents(currentSessionStudents);
     };
 
-    setStudentDataCache((prev) => ({ ...prev, [studentId]: data }));
-    return data;
-  };
-
-  // Mock student database
-  const allStudents: Student[] = [
-    { id: '1', studentId: 'STU001', name: 'John Doe', initials: 'JD' },
-    { id: '2', studentId: 'STU002', name: 'Jane Smith', initials: 'JS' },
-    { id: '3', studentId: '12345', name: 'Michael Johnson', initials: 'MJ' },
-    { id: '4', studentId: '67890', name: 'Emily Brown', initials: 'EB' },
-    { id: '5', studentId: 'STU005', name: 'David Wilson', initials: 'DW' },
-    { id: '6', studentId: '54321', name: 'Sarah Davis', initials: 'SD' },
-    { id: '7', studentId: 'STU007', name: 'James Miller', initials: 'JM' },
-    { id: '8', studentId: '98765', name: 'Lisa Anderson', initials: 'LA' },
-  ];
-
-  // Auto-focus input on mount
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  // Countdown timer
-  useEffect(() => {
-    if (countdownTime <= 0) return;
-
-    const interval = setInterval(() => {
-      setCountdownTime((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [countdownTime]);
-
-  useEffect(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
+    void hydrateCheckedInStudents();
+    return attendanceService.subscribe(() => {
+      void hydrateCheckedInStudents();
+    });
+  }, [allStudents, currentStep, selectedSessionLabel]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -106,385 +307,498 @@ export default function TakeAttendance() {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const handleCheckIn = (e: React.FormEvent) => {
+  const handleLevelSelect = (level: AttendanceLevelId) => {
+    if (typeof window !== 'undefined') {
+      const nextUrl = `${window.location.pathname}?level=${encodeURIComponent(level)}`;
+      window.open(nextUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleSessionSelect = (session: string) => {
+    // Find the session object to check if it's within active time window
+    const sessionObj = selectedDayConfig?.sessions.find(s => s.name === session);
+    if (sessionObj && !isSessionActive(sessionObj)) {
+      toast.error(`❌ Session not active. ${sessionObj.time}`);
+      setIsSessionTimeLocked(true);
+      return;
+    }
+
+    setSelectedSession(session);
+    setIsSessionTimeLocked(false);
+    
+    // Calculate time remaining in session
+    if (sessionObj) {
+      const remaining = getSessionTimeRemaining(sessionObj);
+      setCountdownTime(Math.max(0, remaining * 60)); // Convert minutes to seconds
+    }
+    
+    setCurrentStep('scanner');
+  };
+
+  const handleDaySelect = (day: AttendanceDayId) => {
+    if (selectedLevelConfig) {
+      const pickedDay = selectedLevelConfig.days.find((item) => item.id === day);
+      if (pickedDay && pickedDay.dayOfWeek !== todayWeekday) {
+        toast.error(`Only ${todayWeekday} attendance is open today`);
+        return;
+      }
+    }
+
+    setSelectedDay(day);
+    setSelectedSession(null);
+    setCheckedInStudents([]);
+    setCurrentStep('session');
+  };
+
+  const submitUnknownStudentApproval = (studentId: string) => {
+    setUnknownStudentId(studentId);
+    setUnknownStudentModalStep('confirm');
+    setUnknownStudentName('');
+    setUnknownStudentCampus('Lagos Island');
+    setUnknownStudentModalOpen(true);
+  };
+
+  const handleUnknownStudentApprovalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedLevel) {
+      toast.error('No level selected');
+      return;
+    }
 
+    if (!unknownStudentName.trim() || !unknownStudentId.trim()) {
+      toast.error('Name and Student ID are required');
+      return;
+    }
+
+    setSubmittingUnknownStudent(true);
+    try {
+      await approvalService.createApprovalRequest({
+        id: Date.now() + Math.floor(Math.random() * 10000),
+        studentId: unknownStudentId.trim().toUpperCase(),
+        name: unknownStudentName.trim(),
+        email: `${unknownStudentId.trim().toLowerCase()}@pending.local`,
+        campus: unknownStudentCampus,
+        level: selectedLevel,
+        parentGuardian: 'N/A',
+        parentPhone: 'N/A',
+        notes: `Requested from scanner for ${selectedLevel}`,
+        submittedBy: session?.displayName ?? session?.identifier ?? 'Volunteer',
+        submittedAt: new Date().toLocaleString('en-US'),
+        status: 'pending',
+      });
+
+      toast.success('Approval request sent to admin for review');
+      setUnknownStudentModalOpen(false);
+    } finally {
+      setSubmittingUnknownStudent(false);
+    }
+  };
+
+  const checkInStudent = async (student: Student) => {
+    // Check if session is closed
+    if (selectedLevel) {
+      const isClosed = await sessionService.isSessionClosed(
+        new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        selectedSessionLabel,
+        selectedLevel,
+        student.studentId
+      );
+      
+      if (isClosed) {
+        toast.error(`❌ Session is closed. Only exceptions allowed.`);
+        return false;
+      }
+    }
+
+    if (checkedInStudents.some((s) => s.studentId === student.studentId)) {
+      toast.error(`${student.name} is already checked in`);
+      return false;
+    }
+
+    const checkedInStudent: CheckedInStudent = {
+      ...student,
+      checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      sessionName: selectedSessionLabel,
+    };
+
+    setCheckedInStudents((prev) => [checkedInStudent, ...prev]);
+    toast.success(`✓ ${student.name} checked in`);
+
+    await attendanceService.recordAttendance({
+      id: Date.now() + Math.floor(Math.random() * 10000),
+      studentId: student.studentId,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      session: selectedSessionLabel,
+      status: 'present',
+      volunteer: session?.displayName ?? session?.identifier ?? 'Volunteer',
+      volunteerId: session?.identifier ?? 'VOL-LOCAL',
+    });
+
+    return true;
+  };
+
+  const handleCheckIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isSessionTimeLocked) {
+      toast.error('❌ Session time window has closed. Cannot check in.');
+      return;
+    }
+    
     const studentIdUpper = idInput.toUpperCase().trim();
-
     if (!studentIdUpper) {
       toast.error('Please enter a student ID');
       return;
     }
 
-    // Find student
-    const student = allStudents.find(
-      (s) => s.studentId.toUpperCase() === studentIdUpper
-    );
+    if (!selectedLevel) {
+      toast.error('Select a level before scanning');
+      return;
+    }
 
+    const student = allStudents.find((s) => s.studentId.toUpperCase() === studentIdUpper);
     if (!student) {
-      toast.error(`Student ID "${idInput}" not found`);
+      const otherLevel: AttendanceLevelId = selectedLevel === 'Level 1' ? 'Level 2' : 'Level 1';
+      const inOtherLevel = studentsByLevel[otherLevel].some(
+        (candidate) => candidate.studentId.toUpperCase() === studentIdUpper,
+      );
+
+      if (inOtherLevel) {
+        toast.error('Student not in this level');
+        setIdInput('');
+        return;
+      }
+
+      submitUnknownStudentApproval(studentIdUpper);
       setIdInput('');
       return;
     }
-
-    // Check if already checked in
-    if (checkedInStudents.find((s) => s.studentId === student.studentId)) {
-      toast.error(`${student.name} is already checked in`);
-      setIdInput('');
-      return;
-    }
-
-    // Add to checked-in list with animation
-    const checkedInStudent: CheckedInStudent = {
-      ...student,
-      checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      sessionName: session.name,
-      animation: true,
-    };
-
-    setCheckedInStudents([checkedInStudent, ...checkedInStudents]);
-    toast.success(`✓ ${student.name} checked in successfully!`);
+    await checkInStudent(student);
     setIdInput('');
-
-    // Remove animation flag after animation completes
-    setTimeout(() => {
-      setCheckedInStudents((prev) =>
-        prev.map((s) => (s.id === student.id ? { ...s, animation: false } : s))
-      );
-    }, 500);
-
-    // Success feedback
-    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const handleQuickCheckIn = (student: Student) => {
-    // Check if already checked in
-    if (checkedInStudents.find((s) => s.studentId === student.studentId)) {
-      toast.error(`${student.name} is already checked in`);
-      return;
+  if (currentStep === 'level') {
+    return (
+      <div className="min-h-screen bg-[#f2f2f5] text-slate-900 antialiased font-sans">
+        <Toaster position="top-right" richColors />
+        <BrandHeader navigate={navigate} onBack={() => navigate('/volunteer/dashboard')} />
+
+        <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-20 pb-16 text-center">
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-black">Select Level Attendance Session</h1>
+          <p className="mt-4 text-base md:text-lg font-medium text-slate-700">Offline-first student attendance and records platform designed</p>
+          <p className="text-base md:text-lg font-medium text-slate-700">for Bible School operations. Fast, reliable, and built for weekend sessions</p>
+
+          <div className="mt-14 grid md:grid-cols-2 gap-10">
+            {ATTENDANCE_LEVELS.map((level) => (
+              <LevelSelectionCard key={level.id} level={level} onSelect={handleLevelSelect} />
+            ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (currentStep === 'session') {
+    const filteredSessions = selectedDayConfig?.sessions ?? [];
+
+    if (!selectedLevelConfig || !selectedDayConfig) {
+      return null;
     }
 
-    // Add to checked-in list
-    const checkedInStudent: CheckedInStudent = {
-      ...student,
-      checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      sessionName: session.name,
-      animation: true,
-    };
+    return (
+      <div className="min-h-screen bg-[#f2f2f5] text-slate-900 antialiased font-sans">
+        <Toaster position="top-right" richColors />
+        <BrandHeader navigate={navigate} onBack={() => setCurrentStep('day')} />
 
-    setCheckedInStudents([checkedInStudent, ...checkedInStudents]);
-    toast.success(`✓ ${student.name} checked in successfully!`);
-    setSearchQuery('');
-    setConfirmStudent(null);
+        <section className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pt-16 pb-16 text-center">
+          <div className="mx-auto w-fit rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            {selectedLevelConfig.id} • {selectedDayConfig.id}
+          </div>
+          <h1 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-black">{selectedDayConfig.label}</h1>
+          <p className="mt-4 text-base md:text-lg font-medium text-slate-700">{selectedDayConfig.description}</p>
 
-    // Remove animation flag after animation completes
-    setTimeout(() => {
-      setCheckedInStudents((prev) =>
-        prev.map((s) => (s.id === student.id ? { ...s, animation: false } : s))
-      );
-    }, 500);
+          {selectedDayConfig.sessionVariant === 'feature' ? (
+            <div className="mt-14 mx-auto max-w-3xl space-y-6">
+              {filteredSessions.map((session) => (
+                <SessionSelectionCard key={session.name} day={selectedDayConfig} session={session} onSelect={handleSessionSelect} />
+              ))}
+            </div>
+          ) : (
+            <div className={`mt-14 grid items-stretch gap-8 ${selectedDayConfig.sessionGridClass}`}>
+              {filteredSessions.map((session) => (
+                <div key={session.name} className={session.spanFullRow ? 'md:col-span-2' : ''}>
+                  <SessionSelectionCard day={selectedDayConfig} session={session} onSelect={handleSessionSelect} />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
 
-    // Refocus scanner input
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
+  if (currentStep === 'day') {
+    if (!selectedLevelConfig) {
+      return null;
+    }
 
-  // Filter students based on search query
-  const filteredStudents = searchQuery
-    ? allStudents.filter((student) =>
-        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
+    const openDays = selectedLevelConfig.days.filter((day) => day.dayOfWeek === todayWeekday);
+
+    return (
+      <div className="min-h-screen bg-[#f2f2f5] text-slate-900 antialiased font-sans">
+        <Toaster position="top-right" richColors />
+        <BrandHeader navigate={navigate} onBack={() => setCurrentStep('level')} />
+
+        <section className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pt-16 pb-16 text-center">
+          <div className="mx-auto w-fit rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            {selectedLevelConfig.id}
+          </div>
+          <h1 className="mt-6 text-4xl md:text-5xl font-black tracking-tight text-black">Choose Attendance Day</h1>
+          <p className="mt-4 text-base md:text-lg font-medium text-slate-700">Attendance day is auto-detected from today&apos;s schedule.</p>
+
+          {openDays.length === 0 && (
+            <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm font-medium">
+              No attendance day is open for {todayWeekday}. Sessions are configured for Saturday and Sunday only.
+            </div>
+          )}
+
+          <div className="mt-14 grid gap-8 md:grid-cols-2">
+            {openDays.map((day) => (
+              <button
+                key={day.id}
+                onClick={() => handleDaySelect(day.id)}
+                className="group w-full rounded-xl border border-slate-300 bg-[#f2f2f5] p-8 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-400 cursor-pointer"
+              >
+                <div className="flex items-start justify-between gap-6">
+                  <div>
+                    <div className="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                      Attendance Day
+                    </div>
+                    <h2 className="mt-5 text-3xl font-black text-black">{day.id}</h2>
+                    <p className="mt-3 text-base font-medium text-slate-700">{day.description}</p>
+                  </div>
+                  <div className="h-14 w-14 rounded-full bg-slate-200" />
+                </div>
+
+                <div className="mt-8 flex items-center justify-between">
+                  <span className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Proceed</span>
+                  <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white transition-transform group-hover:translate-x-0.5">
+                    <ArrowRight className="w-5 h-5" />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
-    <div className={`h-screen overflow-hidden ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+    <div className="min-h-screen bg-slate-50">
       <Toaster position="top-right" richColors />
-      {/* Header */}
-      <header className={`border-b ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-lg`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="bg-white border-b border-slate-200 shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/volunteer/dashboard')}
-                className={`w-10 h-10 rounded-lg ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} flex items-center justify-center transition-colors`}
-              >
-                <ArrowLeft className={`w-5 h-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`} />
+              <button onClick={() => setCurrentStep('session')} className="rounded-lg bg-slate-100 p-2 hover:bg-slate-200 transition-colors">
+                <ArrowLeft className="w-5 h-5 text-slate-900" />
               </button>
               <div>
-                <h1 className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontWeight: '700', fontSize: '1.25rem' }}>
-                  Attendance Scanning
-                </h1>
-                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.75rem' }}>Monday, April 7, 2026</p>
+                <h1 className="text-2xl font-black tracking-tight">Attendance Scanner</h1>
+                <p className="text-sm text-slate-600">{selectedLevel} — {selectedDay} — {selectedSession}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Theme Toggle */}
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`w-10 h-10 rounded-lg ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} flex items-center justify-center transition-colors`}
-              >
-                {isDarkMode ? (
-                  <Sun className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <Moon className="w-5 h-5 text-gray-700" />
-                )}
-              </button>
-              <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-1 rounded-full flex items-center gap-2`}>
-                <User className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'}`} />
-                <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`} style={{ fontSize: '0.75rem', fontWeight: '600' }}>Active Today</span>
+            <div className="flex items-center gap-2">
+              <div className="bg-slate-100 px-3 py-1 rounded-full flex items-center gap-2">
+                <User className="w-4 h-4 text-slate-700" />
+                <span className="text-slate-700 text-sm font-medium">Active today</span>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center">
-                <span className="text-white" style={{ fontWeight: '700' }}>0</span>
+              <div className="w-10 h-10 rounded-lg bg-black text-white flex items-center justify-center font-bold text-sm">
+                {checkedInStudents.length}
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-89px)] overflow-hidden flex flex-col">
-        <div className="grid lg:grid-cols-3 gap-6 flex-1 min-h-0">
-          {/* Left Column - Scanner */}
-          <div className="lg:col-span-2 flex flex-col gap-6 min-h-0 flex-[3.5]">
-            {/* Session Card */}
-            <div className="bg-black rounded-2xl p-4 flex items-center justify-between shadow-lg flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-white" />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <div className="bg-black rounded-2xl p-6 shadow-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-slate-700 flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white" style={{ fontWeight: '700', fontSize: '1.125rem' }}>
-                    {session.name} Session - {selectedLevel}
-                  </h3>
-                  <p className="text-gray-400" style={{ fontSize: '0.875rem' }}>{session.time}</p>
+                  <h3 className="text-white font-bold">{selectedSession}</h3>
+                  <p className="text-slate-400 text-sm">{selectedLevel}</p>
                 </div>
               </div>
             </div>
 
-            {/* Scanner Card */}
-            <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-2 rounded-2xl p-6 shadow-lg flex-1 min-h-0 flex flex-col`}>
-              {/* QR Code Icon */}
-              <div className="flex-1 flex flex-col items-center justify-center mb-8">
-                <div className={`w-64 h-64 border-4 border-gray-300 rounded-2xl flex items-center justify-center ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
-                  <QrCode className={`w-40 h-40 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+            <div className="bg-white rounded-2xl border-2 border-slate-200 p-8 shadow-sm flex-1 flex flex-col">
+              {isSessionTimeLocked ? (
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-6">
+                    <Lock className="w-8 h-8 text-red-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 mb-2">Session Closed</h2>
+                  <p className="text-slate-600 text-center mb-4">This attendance session is no longer active.</p>
+                  <button
+                    onClick={() => setCurrentStep('session')}
+                    className="mt-6 px-6 py-2 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
+                  >
+                    Choose Another Session
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <div className="flex-1 flex flex-col items-center justify-center mb-8">
+                    <div className="w-64 h-64 border-4 border-slate-300 rounded-2xl flex items-center justify-center bg-slate-50">
+                      <QrCode className="w-40 h-40 text-slate-400" />
+                    </div>
+                    <h3 className="text-center text-slate-900 mt-8 mb-2 text-2xl font-bold">Scan Student ID</h3>
+                    <p className="text-center text-slate-600">Enter or scan a student ID card</p>
+                  </div>
 
-                <h3 className={`text-center ${isDarkMode ? 'text-white' : 'text-gray-900'} mt-8 mb-2`} style={{ fontWeight: '700', fontSize: '1.5rem' }}>
-                  Scan Student ID
-                </h3>
-                <p className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '1rem' }}>
-                  Enter or scan a student ID card to log attendance
-                </p>
-              </div>
+                  <form onSubmit={handleCheckIn} className="space-y-4">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={idInput}
+                      onChange={(e) => setIdInput(e.target.value)}
+                      className="w-full px-6 py-4 border-2 border-slate-300 bg-white text-slate-900 placeholder-slate-400 rounded-xl focus:border-slate-500 focus:outline-none transition-colors text-center font-semibold text-lg"
+                      placeholder="Enter Student ID..."
+                      autoFocus
+                    />
+                    <button type="submit" className="w-full py-4 px-6 rounded-xl font-bold bg-black text-white hover:bg-slate-900 transition-colors text-lg">
+                      Log Attendance
+                    </button>
+                  </form>
 
-              <form onSubmit={handleCheckIn} className="space-y-4 flex-shrink-0">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={idInput}
-                  onChange={(e) => {
-                    setIdInput(e.target.value);
-                  }}
-                  className={`w-full px-6 py-5 border-2 ${isDarkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'} rounded-xl focus:border-gray-800 focus:outline-none transition-colors text-center`}
-                  placeholder="Enter Student ID or scan card..."
-                  autoFocus
-                  style={{ fontSize: '1.125rem' }}
-                />
-
-                <button
-                  type="submit"
-                  className={`w-full py-5 px-6 rounded-xl font-semibold transition-colors ${isDarkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-black text-white hover:bg-gray-900'}`}
-                  style={{ fontSize: '1.125rem', fontWeight: '600' }}
-                >
-                  Log Attendance
-                </button>
-              </form>
-
-              {/* Timer */}
-              <div className={`mt-8 pt-8 border-t-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} flex items-center justify-between flex-shrink-0`}>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-gray-600" />
-                  <span className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                    {formatTime(countdownTime)}
-                  </span>
-                </div>
-                <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.875rem' }}>
-                  Until Next Session
-                </span>
-              </div>
+                  <div className="mt-8 pt-8 border-t-2 border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-slate-500" />
+                      <span className="text-slate-900 text-xl font-bold">{formatTime(countdownTime)}</span>
+                    </div>
+                    <span className="text-slate-600 text-sm">Time Remaining</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Right Column - Recent Check-ins */}
-          <div className="lg:col-span-1 flex flex-col gap-6 min-h-0 flex-[2]">
-            {/* Stats Box */}
-            <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-2 rounded-2xl p-4 shadow-lg`}>
+          <div className="flex flex-col gap-6">
+            <div className="bg-white rounded-2xl border-2 border-slate-200 p-4 shadow-sm">
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center">
-                  <div className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center mx-auto mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center mx-auto mb-2">
                     <CheckCircle className="w-5 h-5 text-white" />
                   </div>
-                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`} style={{ fontSize: '0.7rem' }}>Present</p>
-                  <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                    {checkedInStudents.length}
-                  </p>
+                  <p className="text-slate-600 text-xs font-semibold mb-1">Present</p>
+                  <p className="text-slate-900 text-xl font-bold">{checkedInStudents.length}</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-10 h-10 rounded-lg bg-gray-400 flex items-center justify-center mx-auto mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-slate-400 flex items-center justify-center mx-auto mb-2">
                     <User className="w-5 h-5 text-white" />
                   </div>
-                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`} style={{ fontSize: '0.7rem' }}>Absent</p>
-                  <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                    {allStudents.length - checkedInStudents.length}
-                  </p>
+                  <p className="text-slate-600 text-xs font-semibold mb-1">Absent</p>
+                  <p className="text-slate-900 text-xl font-bold">{allStudents.length - checkedInStudents.length}</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center mx-auto mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center mx-auto mb-2">
                     <TrendingUp className="w-5 h-5 text-white" />
                   </div>
-                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`} style={{ fontSize: '0.7rem' }}>Rate</p>
-                  <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                    {allStudents.length > 0 ? Math.round((checkedInStudents.length / allStudents.length) * 100) : 0}%
-                  </p>
+                  <p className="text-slate-600 text-xs font-semibold mb-1">Rate</p>
+                  <p className="text-slate-900 text-xl font-bold">{allStudents.length > 0 ? Math.round((checkedInStudents.length / allStudents.length) * 100) : 0}%</p>
                 </div>
               </div>
             </div>
 
-            <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-2 rounded-2xl p-6 shadow-lg flex-1 min-h-0 flex flex-col`}>
-              <h3 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4 flex items-center gap-2`} style={{ fontWeight: '700', fontSize: '1.125rem' }}>
-                <CheckCircle className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'}`} />
+            <div className="bg-white rounded-2xl border-2 border-slate-200 p-6 shadow-sm flex flex-col">
+              <h3 className="text-slate-900 mb-4 flex items-center gap-2 font-bold">
+                <CheckCircle className="w-5 h-5 text-slate-700" />
                 Recent Check-ins
               </h3>
-
               {checkedInStudents.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center text-center">
-                  <div>
-                    <div className={`w-16 h-16 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mx-auto mb-4`}>
-                      <User className={`w-8 h-8 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-                    </div>
-                    <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.875rem' }}>
-                      No scans yet,<br />start scanning to see<br />check-ins appear here
-                    </p>
-                  </div>
+                  <p className="text-slate-600 text-sm">No scans yet</p>
                 </div>
               ) : (
-                <div className="space-y-3 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-2 overflow-y-auto max-h-80 pr-1">
                   {checkedInStudents.map((student, index) => (
-                    <button
-                      key={student.id}
-                      onClick={() => {
-                        setSelectedStudent(student);
-                      }}
-                      className={`w-full border-2 rounded-xl p-3 transition-colors cursor-pointer ${
-                        index === 0
-                          ? isDarkMode
-                            ? 'bg-gray-700 border-gray-600 hover:bg-gray-600'
-                            : 'bg-gray-100 border-gray-300 hover:bg-gray-200'
-                          : isDarkMode
-                          ? 'bg-gray-700 border-gray-600 hover:bg-gray-600'
-                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
+                    <div key={student.id} className="border-2 border-slate-200 rounded-lg p-3 bg-slate-50">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-white" style={{ fontWeight: '600', fontSize: '0.875rem' }}>
+                        <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-white text-xs font-bold">
                           {student.initials}
                         </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <h4 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} truncate`} style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                            {student.name}
-                          </h4>
-                          <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} truncate`} style={{ fontSize: '0.75rem', fontWeight: '600' }}>
-                            Student ID: {student.studentId}
-                          </p>
-                          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.75rem' }}>
-                            Checked in at {student.checkInTime}
-                          </p>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-slate-900 truncate text-sm font-semibold">{student.name}</h4>
+                          <p className="text-slate-600 truncate text-xs">{student.studentId}</p>
                         </div>
-                        {index === 0 && (
-                          <CheckCircle className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'} flex-shrink-0`} />
-                        )}
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Student Search Section */}
-            <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-2 rounded-2xl p-6 shadow-lg flex-1 min-h-0 flex flex-col`}>
+            <div className="bg-white rounded-2xl border-2 border-slate-200 p-6 shadow-sm flex-1 flex flex-col">
               <div className="flex items-center gap-2 mb-4">
-                <Search className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'}`} />
-                <h3 className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontWeight: '700', fontSize: '1.125rem' }}>
-                  Quick Student Lookup
-                </h3>
+                <Search className="w-5 h-5 text-slate-700" />
+                <h3 className="text-slate-900 font-bold">Quick Lookup</h3>
               </div>
-              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`} style={{ fontSize: '0.875rem' }}>
-                Search by name or ID for students without their card
-              </p>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full px-4 py-3 border-2 ${isDarkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'} rounded-xl focus:border-gray-800 focus:outline-none transition-colors`}
+                className="w-full px-4 py-2 border-2 border-slate-300 bg-white text-slate-900 placeholder-slate-400 rounded-lg focus:border-slate-500 focus:outline-none transition-colors text-sm mb-4"
                 placeholder="Search by name or ID..."
-                style={{ fontSize: '1rem' }}
               />
-
-              {/* Search Results */}
               {searchQuery ? (
-                <div className="mt-4 space-y-2 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-2 flex-1 overflow-y-auto">
                   {filteredStudents.length > 0 ? (
                     filteredStudents.map((student) => {
-                      const alreadyCheckedIn = checkedInStudents.find((s) => s.studentId === student.studentId);
+                      const alreadyCheckedIn = checkedInStudents.some((s) => s.studentId === student.studentId);
+
                       return (
-                        <button
-                          key={student.id}
-                          onClick={() => !alreadyCheckedIn && setConfirmStudent(student)}
-                          disabled={!!alreadyCheckedIn}
-                          className={`w-full border-2 rounded-xl p-3 transition-colors text-left ${
-                            alreadyCheckedIn
-                              ? isDarkMode
-                                ? 'bg-gray-700 border-gray-600 opacity-50 cursor-not-allowed'
-                                : 'bg-gray-100 border-gray-200 opacity-50 cursor-not-allowed'
-                              : isDarkMode
-                              ? 'bg-gray-700 border-gray-600 hover:bg-gray-600 cursor-pointer'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100 cursor-pointer'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-white flex-shrink-0`} style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                              {student.initials}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} truncate`} style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                                {student.name}
-                              </h4>
-                              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.75rem' }}>
-                                ID: {student.studentId}
-                              </p>
-                            </div>
-                            {alreadyCheckedIn && (
-                              <CheckCircle className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'} flex-shrink-0`} />
-                            )}
+                      <button
+                        key={student.id}
+                        onClick={() => {
+                          if (alreadyCheckedIn) {
+                            toast.error(`${student.name} is already checked in`);
+                            return;
+                          }
+                          setQuickLookupCandidate(student);
+                        }}
+                        className={`w-full border-2 rounded-lg p-3 transition-colors text-left ${
+                          alreadyCheckedIn
+                            ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                        }`}
+                        disabled={alreadyCheckedIn}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {student.initials}
                           </div>
-                        </button>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-slate-900 truncate text-sm font-semibold">{student.name}</h4>
+                            <p className="text-slate-600 text-xs">{student.studentId}</p>
+                          </div>
+                          {alreadyCheckedIn && <span className="text-[10px] font-bold uppercase tracking-wide">Checked in</span>}
+                        </div>
+                      </button>
                       );
                     })
                   ) : (
-                    <div className={`text-center py-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.875rem' }}>
-                      No students found matching "{searchQuery}"
-                    </div>
+                    <div className="text-center py-4 text-slate-600 text-sm">No students found</div>
                   )}
                 </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-center">
-                  <div>
-                    <div className={`w-16 h-16 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mx-auto mb-4`}>
-                      <Search className={`w-8 h-8 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-                    </div>
-                    <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.875rem' }}>
-                      Type a name or ID<br />to search
-                    </p>
-                  </div>
+                  <p className="text-slate-600 text-sm">Type a name or ID</p>
                 </div>
               )}
             </div>
@@ -492,209 +806,160 @@ export default function TakeAttendance() {
         </div>
       </div>
 
-      {/* Student Detail Modal */}
-      {selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto border-2`}>
-            {/* Modal Header */}
-            <div className="bg-black p-6 rounded-t-2xl relative">
+      {unknownStudentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 p-5">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Unknown Student</h3>
+                <p className="text-sm text-slate-600">Student ID {unknownStudentId} was not found in any level.</p>
+              </div>
               <button
-                onClick={() => setSelectedStudent(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors"
+                onClick={() => setUnknownStudentModalOpen(false)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close"
               >
-                <X className="w-5 h-5 text-white" />
+                <X className="h-4 w-4" />
               </button>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-black shadow-lg" style={{ fontWeight: '700', fontSize: '1.5rem' }}>
-                  {selectedStudent.initials}
-                </div>
-                <div>
-                  <h3 className="text-white mb-1" style={{ fontWeight: '700', fontSize: '1.5rem' }}>
-                    {selectedStudent.name}
-                  </h3>
-                  <p className="text-gray-200" style={{ fontSize: '0.875rem' }}>
-                    ID: {selectedStudent.studentId}
-                  </p>
-                </div>
-              </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-6">
-              {/* Student Info */}
-              <div>
-                <h4 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} mb-3`} style={{ fontWeight: '700', fontSize: '1rem' }}>
-                  Contact Information
-                </h4>
-                <div className="space-y-3">
-                  <div className={`flex items-center gap-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    <Mail className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'}`} />
-                    <span style={{ fontSize: '0.875rem' }}>
-                      {selectedStudent.studentId.toLowerCase()}@bibleschool.edu
-                    </span>
-                  </div>
-                  <div className={`flex items-center gap-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    <Phone className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'}`} />
-                    <span style={{ fontSize: '0.875rem' }}>
-                      {generateAttendanceHistory(selectedStudent.studentId).phone}
-                    </span>
-                  </div>
+            {unknownStudentModalStep === 'confirm' ? (
+              <div className="space-y-4 p-5">
+                <p className="text-sm text-slate-700">
+                  This ID is unknown. Do you want to add as a new student and send to admin for approval?
+                </p>
+                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setUnknownStudentModalOpen(false)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnknownStudentModalStep('form')}
+                    className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+                    Add as new student
+                  </button>
                 </div>
               </div>
-
-              {/* Current Check-in */}
-              <div className={`${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'} border-2 rounded-xl p-4`}>
-                <h4 className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2 flex items-center gap-2`} style={{ fontWeight: '700', fontSize: '0.875rem' }}>
-                  <CheckCircle className="w-4 h-4" />
-                  Current Check-in
-                </h4>
-                <div className="space-y-1">
-                  <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`} style={{ fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: '600' }}>Session:</span> {selectedStudent.sessionName}
-                  </p>
-                  <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`} style={{ fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: '600' }}>Time:</span> {selectedStudent.checkInTime}
-                  </p>
-                </div>
-              </div>
-
-              {/* Attendance History */}
-              <div>
-                <h4 className={`${isDarkMode ? 'text-white' : 'text-gray-900'} mb-3`} style={{ fontWeight: '700', fontSize: '1rem' }}>
-                  Recent Attendance
-                </h4>
-                <div className="space-y-2">
-                  {generateAttendanceHistory(selectedStudent.studentId).history.map((record: any, index: number) => (
-                    <div
-                      key={index}
-                      className={`p-3 rounded-xl border-2 ${
-                        record.status === 'present'
-                          ? isDarkMode
-                            ? 'bg-gray-700 border-gray-600'
-                            : 'bg-gray-100 border-gray-300'
-                          : isDarkMode
-                          ? 'bg-gray-700 border-gray-600'
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
+            ) : (
+              <form onSubmit={handleUnknownStudentApprovalSubmit} className="space-y-4 p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Full Name</label>
+                    <input
+                      value={unknownStudentName}
+                      onChange={(e) => setUnknownStudentName(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                      placeholder="Enter student full name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Student ID</label>
+                    <input
+                      value={unknownStudentId}
+                      onChange={(e) => setUnknownStudentId(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                      placeholder="Enter student ID"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Level</label>
+                    <input
+                      value={selectedLevel ?? ''}
+                      readOnly
+                      className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Campus</label>
+                    <select
+                      value={unknownStudentCampus}
+                      onChange={(e) => setUnknownStudentCampus(e.target.value as 'Lagos Island' | 'Lagos Mainland')}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                            {record.date}
-                          </p>
-                          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.75rem' }}>
-                            {record.session} Session
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          {record.status === 'present' ? (
-                            <>
-                              <CheckCircle className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-700'} ml-auto mb-1`} />
-                              <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`} style={{ fontSize: '0.75rem', fontWeight: '600' }}>
-                                {record.time}
-                              </p>
-                            </>
-                          ) : (
-                            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} style={{ fontSize: '0.75rem', fontWeight: '600' }}>
-                              Absent
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      <option value="Lagos Island">Lagos Island</option>
+                      <option value="Lagos Mainland">Lagos Mainland</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              {/* Attendance Stats */}
-              <div className={`${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'} border-2 rounded-xl p-4`}>
-                <h4 className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`} style={{ fontWeight: '700', fontSize: '0.875rem' }}>
-                  Attendance Summary
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`} style={{ fontSize: '0.75rem' }}>
-                      Present
-                    </p>
-                    <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                      {generateAttendanceHistory(selectedStudent.studentId).history.filter((r: any) => r.status === 'present').length}
-                    </p>
-                  </div>
-                  <div>
-                    <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`} style={{ fontSize: '0.75rem' }}>
-                      Rate
-                    </p>
-                    <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: '1.25rem', fontWeight: '700' }}>
-                      {Math.round((generateAttendanceHistory(selectedStudent.studentId).history.filter((r: any) => r.status === 'present').length / 5) * 100)}%
-                    </p>
-                  </div>
+                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setUnknownStudentModalStep('confirm')}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingUnknownStudent}
+                    className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {submittingUnknownStudent ? 'Sending...' : 'Send For Approval'}
+                  </button>
                 </div>
-              </div>
-            </div>
+              </form>
+            )}
           </div>
         </div>
       )}
 
-      {/* Confirmation Modal */}
-      {confirmStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl max-w-sm w-full border-2`}>
-            {/* Modal Header */}
-            <div className="bg-black p-6 rounded-t-2xl relative">
+      {quickLookupCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 p-5">
+              <h3 className="text-lg font-bold text-slate-900">Confirm Check-in</h3>
               <button
-                onClick={() => setConfirmStudent(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors"
+                onClick={() => setQuickLookupCandidate(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close"
               >
-                <X className="w-5 h-5 text-white" />
+                <X className="h-4 w-4" />
               </button>
-              <div className="text-center">
-                <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center text-black shadow-lg mx-auto mb-4" style={{ fontWeight: '700', fontSize: '2rem' }}>
-                  {confirmStudent.initials}
-                </div>
-                <h3 className="text-white mb-1" style={{ fontWeight: '700', fontSize: '1.5rem' }}>
-                  {confirmStudent.name}
-                </h3>
-                <p className="text-purple-200" style={{ fontSize: '0.875rem' }}>
-                  ID: {confirmStudent.studentId}
-                </p>
-              </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6">
-              <p className={`text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-6`} style={{ fontSize: '1rem' }}>
-                Confirm check-in for this student?
-              </p>
-              <div className="flex gap-3">
+            <div className="p-5">
+              <p className="text-sm text-slate-700 mb-4">Do you want to check in this student?</p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="font-semibold text-slate-900">{quickLookupCandidate.name}</p>
+                <p className="text-xs text-slate-600 mt-1">{quickLookupCandidate.studentId}</p>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
                 <button
-                  onClick={() => setConfirmStudent(null)}
-                  className={`flex-1 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'} py-3 px-4 rounded-xl transition-colors`}
-                  style={{ fontWeight: '600', fontSize: '1rem' }}
+                  type="button"
+                  onClick={() => setQuickLookupCandidate(null)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleQuickCheckIn(confirmStudent)}
-                  className="flex-1 bg-black hover:bg-gray-900 text-white py-3 px-4 rounded-xl transition-colors"
-                  style={{ fontWeight: '600', fontSize: '1rem' }}
+                  type="button"
+                  onClick={() => {
+                    void (async () => {
+                      const didCheckIn = await checkInStudent(quickLookupCandidate);
+                      if (didCheckIn) {
+                        setSearchQuery('');
+                      }
+                      setQuickLookupCandidate(null);
+                    })();
+                  }}
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                 >
-                  Confirm Check-in
+                  Check in student
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      <button
-        onClick={() => setIsDarkMode((prev) => !prev)}
-        className={`fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full px-4 py-3 shadow-xl transition-colors ${
-          isDarkMode ? 'bg-gray-800 text-gray-100 hover:bg-gray-700 border border-gray-600' : 'bg-white text-gray-900 hover:bg-gray-100 border border-gray-200'
-        }`}
-      >
-        {isDarkMode ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-purple-600" />}
-        <span style={{ fontSize: '0.875rem', fontWeight: '600' }}>Theme: {isDarkMode ? 'Dark' : 'Light'}</span>
-      </button>
     </div>
   );
 }

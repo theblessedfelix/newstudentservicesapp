@@ -3,10 +3,15 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import IdCardCollection from './pages/IdCardCollection';
 import AdminModulePage from './pages/AdminModulePage';
+import ApprovalsQueue from './pages/ApprovalsQueue';
+import ExceptionQueue from './pages/ExceptionQueue';
+import CsvImport from './pages/CsvImport';
+import Reports from './pages/Reports';
 import VolunteerManagement from './pages/VolunteerManagement';
 import StudentRecordsChoice from './pages/StudentRecordsChoice';
 import Level1StudentManagement from './pages/Level1StudentManagement';
 import Level2StudentManagement from './pages/Level2StudentManagement';
+import SessionManagement from './pages/SessionManagement';
 
 export const router = createHashRouter([
   {
@@ -19,7 +24,11 @@ export const router = createHashRouter([
   },
   {
     path: '/approvals',
-    element: <AdminModulePage title="Approvals Queue" description="Review and approve student registrations submitted by volunteers." />,
+    Component: ApprovalsQueue,
+  },
+  {
+    path: '/exceptions',
+    Component: ExceptionQueue,
   },
   {
     path: '/students',
@@ -35,11 +44,11 @@ export const router = createHashRouter([
   },
   {
     path: '/import',
-    element: <AdminModulePage title="CSV Import" description="Import students from CSV and review skipped records." />,
+    Component: CsvImport,
   },
   {
     path: '/reports',
-    element: <AdminModulePage title="Reports" description="Generate session and summary reports with CSV export." />,
+    Component: Reports,
   },
   {
     path: '/volunteers',
@@ -48,5 +57,9 @@ export const router = createHashRouter([
   {
     path: '/id-cards',
     Component: IdCardCollection,
+  },
+  {
+    path: '/sessions',
+    Component: SessionManagement,
   },
 ]);
