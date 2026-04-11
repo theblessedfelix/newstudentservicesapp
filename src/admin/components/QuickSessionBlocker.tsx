@@ -65,7 +65,7 @@ export function QuickSessionBlocker() {
     }
   };
 
-  const handleOpenSession = async (lockId: string, sessionName: string) => {
+  const handleOpenSession = async (lockId: number, sessionName: string) => {
     setIsClosing(true);
     try {
       await sessionService.openSession(lockId);
@@ -143,7 +143,7 @@ export function QuickSessionBlocker() {
                   {isBlocked ? (
                     <>
                       <Unlock className="w-3 h-3" />
-                      Open
+                      Unblock
                     </>
                   ) : (
                     <>

@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle, Send, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../features/auth/AuthProvider';
 import { exceptionService, EXCEPTION_REASONS, type ExceptionReason } from '../../features/exceptions/exceptionService';
-import { ATTENDANCE_LEVEL_MAP, type AttendanceLevelId } from '../pages/volunteer/attendance/config';
+import { ATTENDANCE_LEVELS, ATTENDANCE_LEVEL_MAP, type AttendanceLevelId } from '../pages/volunteer/attendance/config';
 import { studentService } from '../../features/students/studentService';
 
 interface RequestExceptionModalProps {
@@ -21,12 +21,18 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
   const [details, setDetails] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSession, setSelectedSession] = useState('');
-  const [level] = useState<AttendanceLevelId>(defaultLevel);
+  const [level, setLevel] = useState<AttendanceLevelId>(defaultLevel);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [errors, setErrors] = useState<Record<string, boolean>>({});
 
   const levelConfig = ATTENDANCE_LEVEL_MAP[level];
   const allSessions = levelConfig.days.flatMap((day) => day.sessions.map((s) => s.name));
+
+  // Reset session when level changes
+  useEffect(() => {
+    setSelectedSession('');
+  }, [level]);
 
   // Auto-populate student name when ID changes
   useEffect(() => {
@@ -38,7 +44,7 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
     const lookupStudent = async () => {
       try {
         const students = await studentService.listStudents();
-        const found = students.find((s) => s.id === studentId.toUpperCase());
+        const found = students.find((s) => s.studentId === studentId.trim().toUpperCase());
         if (found) {
           setStudentName(found.name);
         } else {
@@ -56,20 +62,17 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!studentId.trim()) {
-      toast.error('Please enter a student ID');
-      return;
-    }
+    const newErrors: Record<string, boolean> = {};
+    if (!studentId.trim()) newErrors.studentId = true;
+    if (!selectedSession) newErrors.session = true;
+    if (reason === 'other' && !otherReason.trim()) newErrors.otherReason = true;
 
-    if (!selectedSession) {
-      toast.error('Please select a session');
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error('Please fill in all required fields');
       return;
     }
-
-    if (reason === 'other' && !otherReason.trim()) {
-      toast.error('Please specify the other reason');
-      return;
-    }
+    setErrors({});
 
     setIsSubmitting(true);
     try {
@@ -95,6 +98,7 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
       setOtherReason('');
       setReason('other');
       setSelectedSession('');
+      setErrors({});
     } catch (err) {
       toast.error('Failed to submit exception request');
       console.error(err);
@@ -154,17 +158,42 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-5">
+          {/* Level */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 mb-2">Level *</label>
+            <div className="flex gap-2">
+              {ATTENDANCE_LEVELS.map((lvl) => (
+                <button
+                  key={lvl.id}
+                  type="button"
+                  onClick={() => setLevel(lvl.id as AttendanceLevelId)}
+                  disabled={isSubmitting}
+                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition-colors ${
+                    level === lvl.id
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {lvl.id}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Student ID */}
           <div>
             <label className="block text-sm font-semibold text-slate-900 mb-2">Student ID *</label>
             <input
               type="text"
               value={studentId}
-              onChange={(e) => setStudentId(e.target.value.toUpperCase())}
+              onChange={(e) => { setStudentId(e.target.value.toUpperCase()); setErrors(p => ({ ...p, studentId: false })); }}
               placeholder="e.g., STU001"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.studentId ? 'border-red-500 bg-red-50' : 'border-slate-300'
+              }`}
               disabled={isSubmitting}
             />
+            {errors.studentId && <p className="text-red-500 text-xs mt-1">Student ID is required</p>}
             {studentName && (
               <div className="mt-2 flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                 <User className="w-4 h-4 text-blue-600" />
@@ -190,8 +219,10 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
             <label className="block text-sm font-semibold text-slate-900 mb-2">Session *</label>
             <select
               value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => { setSelectedSession(e.target.value); setErrors(p => ({ ...p, session: false })); }}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.session ? 'border-red-500 bg-red-50' : 'border-slate-300'
+              }`}
               disabled={isSubmitting}
             >
               <option value="">Select a session...</option>
@@ -201,6 +232,7 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
                 </option>
               ))}
             </select>
+            {errors.session && <p className="text-red-500 text-xs mt-1">Session is required</p>}
           </div>
 
           {/* Reason */}
@@ -227,11 +259,14 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
               <input
                 type="text"
                 value={otherReason}
-                onChange={(e) => setOtherReason(e.target.value)}
+                onChange={(e) => { setOtherReason(e.target.value); setErrors(p => ({ ...p, otherReason: false })); }}
                 placeholder="What is the reason for this exception?"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.otherReason ? 'border-red-500 bg-red-50' : 'border-slate-300'
+                }`}
                 disabled={isSubmitting}
               />
+              {errors.otherReason && <p className="text-red-500 text-xs mt-1">Please specify the reason</p>}
             </div>
           )}
 

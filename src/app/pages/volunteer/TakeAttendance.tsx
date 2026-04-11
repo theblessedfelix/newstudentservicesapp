@@ -323,12 +323,10 @@ export default function TakeAttendance() {
   };
 
   const handleSessionSelect = (session: string) => {
-    // Find the session object to check if it's within active time window
+    // Find the session object — time window is advisory only; admin controls actual blocking
     const sessionObj = selectedDayConfig?.sessions.find(s => s.name === session);
     if (sessionObj && !isSessionActive(sessionObj)) {
-      toast.error(`❌ Session not active. ${sessionObj.time}`);
-      setIsSessionTimeLocked(true);
-      return;
+      toast.warning(`⚠ Outside scheduled time (${sessionObj.time}). Admin controls access.`);
     }
 
     setSelectedSession(session);
