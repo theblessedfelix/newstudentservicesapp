@@ -86,13 +86,7 @@ export async function signIn(input: SignInInput): Promise<AppSession> {
     return signInTemporary(input);
   }
 
-  // Try temp credentials first — always works regardless of Supabase Auth
-  const expected = temporaryCredentials[input.role];
-  if (input.identifier === expected.identifier && input.password === expected.password) {
-    return signInTemporary(input);
-  }
-
-  const email = input.identifier.includes('@') ? input.identifier : `${input.identifier.toLowerCase()}@rhema.local`;
+  const email = input.identifier.includes('@') ? input.identifier : `${input.identifier.toLowerCase()}@rhema.org`;
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: input.password,
