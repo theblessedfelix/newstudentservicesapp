@@ -320,6 +320,10 @@ export const getAppSetting = (key: string, defaultValue?: any): any => {
   return stored ? JSON.parse(stored) : defaultValue;
 };
 
+export const deleteAppSetting = (key: string): void => {
+  localStorage.removeItem(`app_setting_${key}`);
+};
+
 // CLEAR ALL DATA (use with caution)
 export const clearAllData = async (): Promise<void> => {
   const db = await initDB();
@@ -361,5 +365,6 @@ export default {
   getAttendanceByDate,
   saveAppSetting,
   getAppSetting,
+  deleteAppSetting,
   clearAllData,
 };

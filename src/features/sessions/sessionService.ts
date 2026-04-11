@@ -114,7 +114,7 @@ export const sessionService = {
       await supabase.from('session_locks').delete().eq('id', lockId);
     }
 
-    persistence.saveAppSetting(`session-lock-${lockId}`, null);
+    persistence.deleteAppSetting(`session-lock-${lockId}`);
     publishRealtimeEvent('sessions.changed');
   },
 

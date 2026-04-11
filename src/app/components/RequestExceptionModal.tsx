@@ -23,6 +23,7 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
   const [selectedSession, setSelectedSession] = useState('');
   const [level] = useState<AttendanceLevelId>(defaultLevel);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const levelConfig = ATTENDANCE_LEVEL_MAP[level];
   const allSessions = levelConfig.days.flatMap((day) => day.sessions.map((s) => s.name));
@@ -87,14 +88,13 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
         status: 'pending',
       });
 
-      toast.success('✓ Exception request received and sent to admin for review');
+      setSubmitSuccess(true);
       setStudentId('');
       setStudentName('');
       setDetails('');
       setOtherReason('');
       setReason('other');
       setSelectedSession('');
-      onClose();
     } catch (err) {
       toast.error('Failed to submit exception request');
       console.error(err);
@@ -103,7 +103,38 @@ export function RequestExceptionModal({ isOpen, onClose, defaultLevel = 'Level 1
     }
   };
 
+  // Auto-close modal after success confirmation
+  useEffect(() => {
+    if (!submitSuccess) return;
+    const timer = setTimeout(() => {
+      setSubmitSuccess(false);
+      onClose();
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [submitSuccess, onClose]);
+
   if (!isOpen) return null;
+
+  if (submitSuccess) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-2xl border border-green-200 bg-gradient-to-b from-green-50 to-white shadow-lg p-8 flex flex-col items-center text-center">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Exception Submitted!</h2>
+          <p className="text-slate-600 mb-2">Your request has been sent to admin for review.</p>
+          <p className="text-sm text-slate-500">Status: <span className="font-semibold text-orange-600">Pending</span></p>
+          <div className="mt-6 w-full bg-slate-100 rounded-lg p-3 text-left text-sm text-slate-700">
+            <p><span className="font-semibold">Student:</span> {studentName || studentId}</p>
+            <p><span className="font-semibold">Date:</span> {selectedDate}</p>
+            <p><span className="font-semibold">Session:</span> {selectedSession}</p>
+          </div>
+          <p className="text-xs text-slate-500 mt-6 italic">Closing in a moment...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-sm">
