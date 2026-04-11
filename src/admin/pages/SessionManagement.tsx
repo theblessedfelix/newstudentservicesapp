@@ -49,7 +49,13 @@ export default function SessionManagement() {
       void loadLocks();
     });
 
-    return unsubscribe;
+    // Polling fallback: refresh every 10s in case Realtime misses an event
+    const poll = setInterval(() => void loadLocks(), 10000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(poll);
+    };
   }, []);
 
   const filteredLocks = useMemo(() => {

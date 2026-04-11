@@ -227,14 +227,19 @@ export const exceptionService = {
   },
 
   subscribe(callback: () => void) {
-    const unsubscribe = supabase?.realtime.on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_exceptions' }, () => callback()).subscribe();
-    
-    if (!unsubscribe) {
+    if (!supabase) {
       const listener = () => callback();
       window.addEventListener('offline-mutation-synced', listener);
       return () => window.removeEventListener('offline-mutation-synced', listener);
     }
 
-    return () => unsubscribe?.unsubscribe?.();
+    const channel = supabase
+      .channel('exceptions-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_exceptions' }, callback)
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   },
 };

@@ -39,7 +39,14 @@ export default function ExceptionQueue() {
 
     loadExceptions();
     const unsub = exceptionService.subscribe(() => loadExceptions());
-    return () => unsub?.();
+
+    // Polling fallback: refresh every 10s in case Realtime misses an event
+    const poll = setInterval(() => void loadExceptions(), 10000);
+
+    return () => {
+      unsub?.();
+      clearInterval(poll);
+    };
   }, [session, navigate]);
 
   useEffect(() => {

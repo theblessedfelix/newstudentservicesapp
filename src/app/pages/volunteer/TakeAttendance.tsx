@@ -295,9 +295,17 @@ export default function TakeAttendance() {
     };
 
     void hydrateCheckedInStudents();
-    return attendanceService.subscribe(() => {
+    const unsub = attendanceService.subscribe(() => {
       void hydrateCheckedInStudents();
     });
+
+    // Polling fallback: sync checked-in list every 10s
+    const poll = setInterval(() => void hydrateCheckedInStudents(), 10000);
+
+    return () => {
+      unsub();
+      clearInterval(poll);
+    };
   }, [allStudents, currentStep, selectedSessionLabel]);
 
   const formatTime = (seconds: number) => {
