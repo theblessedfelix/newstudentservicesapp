@@ -37,14 +37,14 @@ export const EXCEPTION_REASONS: Record<ExceptionReason, string> = {
 function normalizeException(row: Record<string, unknown>): AttendanceException {
   return {
     id: Number(row.id),
-    studentId: String(row.student_id ?? row.studentId ?? ''),
-    date: String(row.date ?? ''),
+    studentId: String(row.student_id ?? ''),
+    date: String(row.exception_date ?? ''),
     session: String(row.session ?? ''),
     level: (row.level as AttendanceException['level']) ?? 'Level 1',
     reason: (row.reason as ExceptionReason) ?? 'other',
     details: String(row.details ?? ''),
-    requestedBy: String(row.requested_by ?? row.requestedBy ?? ''),
-    requestedAt: String(row.requested_at ?? row.requestedAt ?? ''),
+    requestedBy: String(row.requested_by ?? ''),
+    requestedAt: String(row.requested_at ?? ''),
     status: (row.status as AttendanceException['status']) ?? 'pending',
     reviewedBy: row.reviewed_by ? String(row.reviewed_by) : undefined,
     reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined,
@@ -105,7 +105,7 @@ export const exceptionService = {
         .from('attendance_exceptions')
         .insert({
           student_id: exception.studentId,
-          date: exception.date,
+          exception_date: exception.date,
           session: exception.session,
           level: exception.level,
           reason: exception.reason,

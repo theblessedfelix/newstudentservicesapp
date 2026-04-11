@@ -6,22 +6,18 @@ import { publishRealtimeEvent, subscribeToRealtimeTopic } from '../shared/realti
 export type AttendanceRecord = {
   id: number;
   studentId: string;
-  date: string;
-  session: string;
-  status: 'present' | 'absent';
-  volunteer: string;
+  attendanceDate: string;
+  sessionNum: number;
   volunteerId: string;
 };
 
 function normalizeAttendance(row: Record<string, unknown>): AttendanceRecord {
   return {
     id: Number(row.id),
-    studentId: String(row.student_id ?? row.studentId ?? ''),
-    date: String(row.date ?? ''),
-    session: String(row.session ?? ''),
-    status: (row.status as AttendanceRecord['status']) ?? 'present',
-    volunteer: String(row.volunteer ?? ''),
-    volunteerId: String(row.volunteer_id ?? row.volunteerId ?? ''),
+    studentId: String(row.student_id ?? ''),
+    attendanceDate: String(row.attendance_date ?? ''),
+    sessionNum: Number(row.session_num ?? 0),
+    volunteerId: String(row.volunteer_id ?? ''),
   };
 }
 
@@ -48,12 +44,9 @@ export const attendanceService = {
   async recordAttendance(record: AttendanceRecord) {
     if (supabase && navigator.onLine) {
       const { error } = await supabase.from('attendance_records').insert({
-        id: record.id,
         student_id: record.studentId,
-        date: record.date,
-        session: record.session,
-        status: record.status,
-        volunteer: record.volunteer,
+        attendance_date: record.attendanceDate,
+        session_num: record.sessionNum,
         volunteer_id: record.volunteerId,
       });
 

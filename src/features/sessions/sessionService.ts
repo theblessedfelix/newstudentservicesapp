@@ -17,14 +17,14 @@ export type SessionLock = {
 function normalizeSessionLock(row: Record<string, unknown>): SessionLock {
   return {
     id: Number(row.id),
-    date: String(row.date ?? ''),
-    session: String(row.session ?? ''),
-    level: (row.level as SessionLock['level']) ?? 'Level 1',
-    status: (row.status as SessionLock['status']) ?? 'open',
-    closedBy: row.closed_by ? String(row.closed_by) : undefined,
-    closedAt: row.closed_at ? String(row.closed_at) : undefined,
-    reason: row.reason ? String(row.reason) : undefined,
-    allowedExceptions: Array.isArray(row.allowed_exceptions) ? row.allowed_exceptions : [],
+    date: String(row.lock_date ?? ''),
+    session: String(row.session_num ?? ''),
+    level: 'Level 1', // Not stored in schema
+    status: row.is_open ? 'open' : 'closed',
+    closedBy: row.locked_by ? String(row.locked_by) : undefined,
+    closedAt: row.created_at ? String(row.created_at) : undefined,
+    reason: undefined,
+    allowedExceptions: [],
   };
 }
 
@@ -79,7 +79,7 @@ export const sessionService = {
     reason?: string
   ): Promise<SessionLock> {
     const lock: SessionLock = {
-      id: Date.now(),
+      id: 0,
       date,
       session,
       level,
@@ -94,14 +94,10 @@ export const sessionService = {
       const { data: inserted, error: insertErr } = await supabase
         .from('session_locks')
         .insert({
-          date,
-          session,
-          level,
-          status: 'closed',
-          closed_by: closedBy,
-          closed_at: lock.closedAt,
-          reason,
-          allowed_exceptions: [],
+          session_num: parseInt(session) || 1,
+          lock_date: date,
+          locked_by: closedBy,
+          is_open: false,
         })
         .select('id')
         .single();

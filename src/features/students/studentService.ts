@@ -15,12 +15,12 @@ export type StudentRecord = {
 function normalizeStudent(row: Record<string, unknown>): StudentRecord {
   return {
     id: Number(row.id),
-    studentId: String(row.student_id ?? row.studentId ?? ''),
+    studentId: String(row.student_id ?? ''),
     name: String(row.name ?? ''),
     email: String(row.email ?? ''),
     campus: (row.campus as StudentRecord['campus']) ?? 'Lagos Island',
     level: (row.level as StudentRecord['level']) ?? 'Level 1',
-    enrollmentDate: String(row.enrollment_date ?? row.enrollmentDate ?? ''),
+    enrollmentDate: String(row.enrollment_date ?? ''),
   };
 }
 
@@ -48,7 +48,7 @@ export const studentService = {
   async saveStudent(student: StudentRecord) {
     if (supabase) {
       const { error } = await supabase.from('students').upsert({
-        id: student.id,
+        id: student.id || undefined,
         student_id: student.studentId,
         name: student.name,
         email: student.email,
