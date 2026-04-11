@@ -101,24 +101,28 @@ export const exceptionService = {
 
   async createException(exception: AttendanceException) {
     if (supabase && navigator.onLine) {
-      const { error } = await supabase.from('attendance_exceptions').insert({
-        id: exception.id,
-        student_id: exception.studentId,
-        date: exception.date,
-        session: exception.session,
-        level: exception.level,
-        reason: exception.reason,
-        details: exception.details,
-        requested_by: exception.requestedBy,
-        requested_at: exception.requestedAt,
-        status: exception.status,
-        reviewed_by: exception.reviewedBy,
-        reviewed_at: exception.reviewedAt,
-        review_notes: exception.reviewNotes,
-      });
+      const { data: inserted, error } = await supabase
+        .from('attendance_exceptions')
+        .insert({
+          student_id: exception.studentId,
+          date: exception.date,
+          session: exception.session,
+          level: exception.level,
+          reason: exception.reason,
+          details: exception.details,
+          requested_by: exception.requestedBy,
+          requested_at: new Date().toISOString(),
+          status: exception.status,
+          reviewed_by: exception.reviewedBy ?? null,
+          reviewed_at: exception.reviewedAt ?? null,
+          review_notes: exception.reviewNotes ?? null,
+        })
+        .select('id')
+        .single();
 
-      if (!error) {
-        persistence.saveAppSetting(`exception-${exception.id}`, exception);
+      if (!error && inserted) {
+        const saved = { ...exception, id: Number(inserted.id) };
+        persistence.saveAppSetting(`exception-${saved.id}`, saved);
         publishRealtimeEvent('exceptions.changed');
         return { synced: true };
       }

@@ -91,17 +91,24 @@ export const sessionService = {
     };
 
     if (supabase) {
-      await supabase.from('session_locks').insert({
-        id: lock.id,
-        date,
-        session,
-        level,
-        status: 'closed',
-        closed_by: closedBy,
-        closed_at: lock.closedAt,
-        reason,
-        allowed_exceptions: [],
-      });
+      const { data: inserted, error: insertErr } = await supabase
+        .from('session_locks')
+        .insert({
+          date,
+          session,
+          level,
+          status: 'closed',
+          closed_by: closedBy,
+          closed_at: lock.closedAt,
+          reason,
+          allowed_exceptions: [],
+        })
+        .select('id')
+        .single();
+
+      if (!insertErr && inserted) {
+        lock.id = Number(inserted.id);
+      }
     }
 
     await persistence.saveAppSetting(`session-lock-${lock.id}`, lock);
