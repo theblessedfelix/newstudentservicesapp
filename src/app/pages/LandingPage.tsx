@@ -55,6 +55,12 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
+
+        <footer className="pb-12 text-center">
+          <span className="inline-block px-3 py-1 bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-full text-gray-400 text-[10px] font-bold tracking-wider">
+            v0.0.1
+          </span>
+        </footer>
         
       </div>
     </div>
